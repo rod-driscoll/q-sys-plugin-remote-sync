@@ -1,0 +1,357 @@
+--[[
+  20250711 v1.0 Rod Driscoll<rod@theavitgroup.com.au>
+]]
+
+PluginInfo = {
+  Name = "Q-SYS~Remote Component Sync-DEV-UI",
+  Version = "1.0.0",
+  Id = "Q-SYS Remote component sync-DEV-UI",
+  Author = "Rod Driscoll<rod@theavitgroup.com.au>",
+  Description = "Synchronise components with a remote core",
+  Manufacturer = "Q-SYS"
+}
+PrettyName = PluginInfo.Id..' '.. PluginInfo.Version
+PageNames = {"Setup","System","Devices"} --List the pages within the plugin
+DefaultColor = { 102, 102, 102 }
+
+function GetColor(props)
+  return DefaultColor
+end
+
+function GetPrettyName()
+  return PrettyName
+end
+
+function GetPages(props)
+  local pages = {}
+  for ix,name in ipairs(PageNames) do
+    table.insert(pages, {name = PageNames[ix]})
+  end
+  return pages
+end
+
+function GetProperties()
+	local props = {}
+  table.insert(props,{
+    Name = 'Component Count',
+    Type = 'integer',
+    Min = 1,
+    Max = 255,
+    Value = 2
+  })
+  table.insert(props,{
+    Name    = "Debug Print",
+    Type    = "enum",
+    Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
+    Value   = "None"
+  })
+	return props
+end
+
+function RectifyProperties(props)
+    if props.plugin_show_debug and props.plugin_show_debug.Value == false and props["Debug Print"] then
+      props["Debug Print"].IsHidden = true
+    end
+	return props
+end
+
+function GetControls(props)
+  local ctrls = {}
+  -- Reveal code pin for testing --
+  table.insert(ctrls, {
+    Name         = "code",
+    ControlType  = "Text",
+    Count        = 1,
+    UserPin      = true,
+    PinStyle     = "Input"
+  })
+  
+  -- Debug controls--
+  table.insert(ctrls, {
+    Name         = "DebugFunction",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+  table.insert(ctrls, {
+    Name         = "DebugTx",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+  table.insert(ctrls, {
+    Name         = "DebugRx",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+  
+  -- Configuration Controls --
+  table.insert(ctrls, {
+    Name         = "IPAddress",
+    ControlType  = "Text",
+    Count        = 1,
+    DefaultValue = "Enter an IP Address",
+    UserPin      = true,
+    PinStyle     = "Both"
+  })
+  table.insert(ctrls, {
+    Name         = "Username",
+    ControlType  = "Text",
+    Count        = 1,
+    DefaultValue = "admin",
+    UserPin      = true,
+    PinStyle     = "Both"
+  })
+  table.insert(ctrls, {
+    Name         = "Password",
+    ControlType  = "Text",
+    Count        = 1,
+    DefaultValue = "",
+    UserPin      = true,
+    PinStyle     = "Both"
+  })
+  table.insert(ctrls, {
+    Name         = "Port",
+    ControlType  = "Text",
+    ControlUnit  = "Integer",
+    DefaultValue = 1710,
+    Min          = 0,
+    Max          = 65535,
+    Count        = 1,
+    UserPin      = true,
+    PinStyle     = "Both"
+  })
+
+  -- Runtime control --
+  table.insert(ctrls, {
+    Name         = "LoadComponents",
+    ControlType  = "Button",
+    ButtonType   = "Trigger",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+
+  table.insert(ctrls, {
+    Name         = "StringToSend",
+    ControlType  = "Text",
+    Count        = 1,
+    DefaultValue = "",
+    UserPin      = true,
+    PinStyle     = "Both"
+  })
+  
+  -- Status Controls --
+  table.insert(ctrls, {
+    Name          = "Status",
+    ControlType   = "Indicator",
+    IndicatorType = Reflect and "StatusGP" or "Status",
+    PinStyle      = "Output",
+    UserPin       = true,
+    Count         = 1
+  })
+  table.insert(ctrls, {
+    Name          = "Connected",
+    ControlType   = "Indicator",
+    IndicatorType = "Led",
+    Count         = 1,
+    UserPin       = true,
+    PinStyle      = "Output"
+  })
+  table.insert(ctrls, {
+    Name          = "LoggedIn",
+    ControlType   = "Indicator",
+    IndicatorType = "Led",
+    Count         = 1,
+    UserPin       = true,
+    PinStyle      = "Output"
+  })
+  table.insert(ctrls, {
+    Name          = "LoginRequired",
+    ControlType   = "Indicator",
+    IndicatorType = "Led",
+    Count         = 1,
+    UserPin       = true,
+    PinStyle      = "Output"
+  })
+  table.insert(ctrls, {
+    Name         = "Platform",
+    ControlType  = "Text",
+    PinStyle     = "Output",
+    UserPin      = true,
+    Count        = 1
+  })
+  table.insert(ctrls, {
+    Name         = "DesignName",
+    ControlType  = "Text",
+    PinStyle     = "Output",
+    UserPin      = true,
+    Count        = 1
+  })
+  
+  --  Components --
+  table.insert(ctrls, {
+    Name         = "LocalComponents",
+    ControlType  = "Text",
+    Style        = "ComboBox",
+    PinStyle     = "Both",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  table.insert(ctrls, {
+    Name         = "RemoteComponents",
+    ControlType  = "Text",
+    Style        = "ComboBox",
+    PinStyle     = "Both",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  table.insert(ctrls, {
+    Name         = "CommonComponents",
+    ControlType  = "Text",
+    Style        = "ComboBox",
+    PinStyle     = "Both",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  table.insert(ctrls, {
+    Name         = "LocalControls",
+    ControlType  = "Text",
+    Style        = "ListBox",
+    PinStyle     = "Output",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  table.insert(ctrls, {
+    Name         = "RemoteControls",
+    ControlType  = "Text",
+    Style        = "ListBox",
+    PinStyle     = "Output",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  table.insert(ctrls, {
+    Name         = "CommonControls",
+    ControlType  = "Text",
+    Style        = "ListBox",
+    PinStyle     = "Output",
+    UserPin      = true,
+    Count        = props['Component Count'].Value
+  })
+  return ctrls
+end
+
+function GetPins(props)
+  local pins = {}
+  return pins
+end
+
+function GetControlLayout(props)
+  local layout = {}
+  local graphics = {}
+  local CurrentPage = PageNames[props["page_index"].Value]
+  
+  local colors = {  
+    Background  = {232,232,232},
+    Transparent = {255,255,255,0},
+    Text        = {24,24,24},
+    Header      = {0,0,0},
+    Button      = {48,32,40},
+    Red         = {217,32,32},
+    DarkRed     = {80,16,16},
+    Green       = {32,217,32},
+    OKGreen     = {48,144,48},
+    Blue        = {32,32,233},
+    Black       = {0,0,0},
+    White       = {255,255,255},
+    Gray        = {96,96,96},
+    LightGray   = {194,194,194}
+  }
+  
+  layout["code"]={PrettyName="code",Style="None"}
+  
+  if(CurrentPage == 'Setup') then
+    table.insert(graphics,{Type="GroupBox",Text="Connect",Fill=colors.Background,StrokeWidth=1,CornerRadius=4,HTextAlign="Left",Position={5,5},Size={400,120}})
+    --table.insert(graphics,{Type="Image",Image=logo,Position={230,45},Size={170,34}})
+  
+    -- User defines connection properties
+    table.insert(graphics,{Type="Text",Text="IP Address"    ,Position={ 15,35},Size={100,16},FontSize=14,HTextAlign="Right"})
+    layout["IPAddress"] = {PrettyName="Settings~IP Address" ,Position={120,35},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
+  
+    table.insert(graphics,{Type="Text",Text="Username"      ,Position={ 15,55},Size={100,16},FontSize=14,HTextAlign="Right"})
+    layout["Username"] = {PrettyName="Settings~Username"    ,Position={120,55},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
+    
+    table.insert(graphics,{Type="Text",Text="Password"      ,Position={ 15,75},Size={100,16},FontSize=14,HTextAlign="Right"})
+    layout["Password"] = {PrettyName="Settings~Password"    ,Position={120,75},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
+  
+    table.insert(graphics,{Type="Knob",Text="Port"          ,Position={ 15,95},Size={100,16},FontSize=14,HTextAlign="Right"})
+    layout["Port"] = {PrettyName="Settings~Port"            ,Position={120,95},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
+  
+    -- Status fields updated upon connect
+    table.insert(graphics,{Type="GroupBox",Text="Status",Fill=colors.Background,StrokeWidth=1,CornerRadius=4,HTextAlign="Left",Position={5,135},Size={400,85}})
+    layout["Status"] = {PrettyName="Status~Connection Status", Position={40,165}, Size={330,32}, Padding=4 }
+    table.insert(graphics,{Type="Text",Text=GetPrettyName(),Position={15,200},Size={380,14},FontSize=10,HTextAlign="Right", Color=colors.Gray})
+  
+  elseif(CurrentPage == 'System') then 
+    table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["LoadComponents"] = {PrettyName="Settings~LoadComponents"  ,Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugFunction"] = {PrettyName="Settings~DebugFunction"    ,Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugTx"] = {PrettyName="Settings~DebugTx"                ,Position={146, 37},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Rx"                ,Position={ 10, 53},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugRx"] = {PrettyName="Settings~DebugRx"                ,Position={146, 53},Size={ 36, 16},FontSize=12,Style="Button"}
+  
+  elseif(CurrentPage == 'Devices') then
+    local columns_ = {
+      {Title="Local components" , Id="LocalComponents" ,Position={ 10,  5}, Cell={Style="ComboBox"}},
+      {Title="Remote components", Id="RemoteComponents",Position={154,  5}, Cell={Style="ComboBox"}},
+      {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
+      {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
+      {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
+    }
+    local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
+    local h = 28
+    local x,y = 0,0
+    table.insert(graphics,{Type="GroupBox",Text="Component selection",Position={x,y},Size={4, 4},FontSize=10,HTextAlign="Left",Fill={242,237,174},StrokeWidth=1,CornerRadius=4})
+    local groupBoxId_ = #graphics
+    x,y = 3, 26 -- anchor
+    x=x+w.Number -- titles - start after the number column
+    for _,v in ipairs(columns_) do
+      local tbl_= {Type="Text",FontSize=11,HTextAlign="Left"}
+      tbl_.Text=v.Title
+      tbl_.Position={x, y}
+      tbl_.Size={w[v.Cell.Style],h}
+      table.insert(graphics,tbl_)
+      x = x + tbl_.Size[1]
+    end
+    y=y+h -- new row
+    local h = 16
+    for i=1, props['Component Count'].Value do
+      x = 3 -- reset x anchor
+      table.insert(graphics,{Type="Text",Text=tostring(i),Position={x,y},Size={w.Number,h},FontSize=12,HTextAlign="Center"})
+      x=x+w.Number -- start after the number column
+      for _,v in ipairs(columns_) do
+        local tbl_ = {}
+        for i1,v1 in pairs(v.Cell) do tbl_[i1]=tbl_[v1] end
+        tbl_.PrettyName = "Device "..i.."~"..v.Id
+        tbl_.Position={x,y}
+        tbl_.Size={w[v.Cell.Style],h}
+        tbl_.FontSize=12
+        layout[v.Id..' '..i] = tbl_
+        x = x + tbl_.Size[1]
+      end
+      y=y+h -- new row
+    end
+    graphics[groupBoxId_].Size={x+h, y+2*h}
+  
+  end
+  return layout, graphics
+end
