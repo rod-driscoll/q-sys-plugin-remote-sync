@@ -27,10 +27,15 @@
       DebugTx,DebugRx,DebugFunction=true,true,true
       --DebugTx,DebugFunction=true,true,true
     end
-    Controls["DebugFunction"].Boolean = DebugFunction
-    Controls["DebugTx"].Boolean = DebugTx
-    Controls["DebugRx"].Boolean = DebugRx
+    Controls.DebugFunction.Boolean = DebugFunction
+    Controls.DebugTx.Boolean = DebugTx
+    Controls.DebugRx.Boolean = DebugRx
   end
+  SetupDebugPrint()
+
+  Controls.DebugFunction.EventHandler = function(ctl) DebugFunction = ctl.Boolean end
+  Controls.DebugTx.EventHandler = function(ctl) DebugTx = ctl.Boolean end
+  Controls.DebugRx.EventHandler = function(ctl) DebugRx = ctl.Boolean end
 	-----------------------------------------------------------------------------------------------------------------------
 	-- Remote Q-Sys control functions
 	-----------------------------------------------------------------------------------------------------------------------

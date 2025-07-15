@@ -39,8 +39,8 @@ if(CurrentPage == 'Setup') then
   table.insert(graphics,{Type="Text",Text="Connected"           ,Position={224,35},Size={100,16},FontSize=14,HTextAlign="Right"})
   layout["Connected"] = {PrettyName="Settings~Connected"        ,Position={324,35},Size={16,16},Style="Led",Color=colors.Green}
 
-  table.insert(graphics,{Type="Text",Text="RequiresLogin"       ,Position={224,55},Size={100,16},FontSize=14,HTextAlign="Right"})
-  layout["RequiresLogin"] = {PrettyName="Settings~RequiresLogin",Position={324,55},Size={16,16},Style="Led",Color=colors.Blue}
+  table.insert(graphics,{Type="Text",Text="Login required"      ,Position={224,55},Size={100,16},FontSize=14,HTextAlign="Right"})
+  layout["LoginRequired"] = {PrettyName="Settings~LoginRequired",Position={324,55},Size={16,16},Style="Led",Color=colors.Blue}
 
   table.insert(graphics,{Type="Text",Text="LoggedIn"            ,Position={224,75},Size={100,16},FontSize=14,HTextAlign="Right"})
   layout["LoggedIn"] = {PrettyName="Settings~LoggedIn"          ,Position={324,75},Size={16,16},Style="Led",Color=colors.Blue}
@@ -67,6 +67,7 @@ elseif(CurrentPage == 'Devices') then
     {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
     {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
     {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
+    {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
   }
   local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
   local h = 28
@@ -76,7 +77,7 @@ elseif(CurrentPage == 'Devices') then
   x,y = 3, 26 -- anchor
   x=x+w.Number -- titles - start after the number column
   for _,v in ipairs(columns_) do
-    local tbl_= {Type="Text",FontSize=11,HTextAlign="Left"}
+    local tbl_= {Type=v.Cell.Style,FontSize=11,HTextAlign="Left"}
     tbl_.Text=v.Title
     tbl_.Position={x, y}
     tbl_.Size={w[v.Cell.Style],h}
@@ -92,6 +93,7 @@ elseif(CurrentPage == 'Devices') then
     for _,v in ipairs(columns_) do
       local tbl_ = {}
       for i1,v1 in pairs(v.Cell) do tbl_[i1]=tbl_[v1] end
+      tbl_.Style = "ComboBox" -- this is done in the line above but repeated here for clarity
       tbl_.PrettyName = "Device "..i.."~"..v.Id
       tbl_.Position={x,y}
       tbl_.Size={w[v.Cell.Style],h}

@@ -1,0 +1,46 @@
+{"jsonrpc":"2.0","result":[
+  {
+    "ID": "FunctionMicGain_1",
+    "Name": "FunctionMicGain_1",
+    "Type": "gain",
+    "Properties": [
+      {
+        "Name": "max_gain",
+        "Value": "0",
+        "PrettyName": "Max Gain (dB)"
+      },
+      {
+        "Name": "min_gain",
+        "Value": "-21",
+        "PrettyName": "Min Gain (dB)"
+      },
+      {
+        "Name": "enable_stepper",
+        "Value": "False",
+        "PrettyName": "Enable Ramp Controls"
+      },
+      {
+        "Name": "step_mode",
+        "Value": "0",
+        "PrettyName": "Mode"
+      },
+      {
+        "Name": "num_steps",
+        "Value": "8",
+        "PrettyName": "Number of Steps"
+      },
+      {
+        "Name": "multi_channel_type",
+        "Value": "1",
+        "PrettyName": "Type"
+      },
+      {
+        "Name": "multi_channel_count",
+        "Value": "8",
+        "PrettyName": "Count"
+      }
+    ],
+    "Controls": null,
+    "ControlSource": 2
+  }
+],"id":"1"}

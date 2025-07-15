@@ -165,7 +165,7 @@ table.insert(ctrls, {
 table.insert(ctrls, {
   Name         = "LocalControls",
   ControlType  = "Text",
-  Style        = "ListBox",
+  Style        = "ComboBox",
   PinStyle     = "Output",
   UserPin      = true,
   Count        = props['Component Count'].Value
@@ -173,7 +173,7 @@ table.insert(ctrls, {
 table.insert(ctrls, {
   Name         = "RemoteControls",
   ControlType  = "Text",
-  Style        = "ListBox",
+  Style        = "ComboBox",
   PinStyle     = "Output",
   UserPin      = true,
   Count        = props['Component Count'].Value
@@ -181,7 +181,7 @@ table.insert(ctrls, {
 table.insert(ctrls, {
   Name         = "CommonControls",
   ControlType  = "Text",
-  Style        = "ListBox",
+  Style        = "ComboBox",
   PinStyle     = "Output",
   UserPin      = true,
   Count        = props['Component Count'].Value
