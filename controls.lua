@@ -186,3 +186,11 @@ table.insert(ctrls, {
   UserPin      = true,
   Count        = props['Component Count'].Value
 })
+table.insert(ctrls, {
+  Name         = "SyncComponent",
+  ControlType  = "Button",
+  ButtonType   = "Toggle",
+  PinStyle     = "Input",
+  UserPin      = true,
+  Count        = props['Component Count'].Value
+})
