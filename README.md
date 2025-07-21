@@ -48,6 +48,10 @@ It is recommented to use the 'common components' drop down box and select compon
 If local and remote components are not the same type then it will sync all controls with the same name if possible.\
 Only writable controls can be synched, e.g. it won't sync the status control of devices.\
 
+### Possible future updates
+
+* 
+
 ## Changelog
 
 20250711 v1.0.0 Rod Driscoll<rod@theavitgroup.com.au>\

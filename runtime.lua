@@ -14,62 +14,62 @@ local DebugPrint = Properties["Debug Print"].Value
 -------------------------------------------------------------------------------------------------------------------
 -- A function to determine common print statement scenarios for troubleshooting
 -- A function to determine common print statement scenarios for troubleshooting
-function SetupDebugPrint()
-  if Properties["Debug Print"].Value=="Tx/Rx" then
-    DebugTx,DebugRx=true,true
-  elseif Properties["Debug Print"].Value=="Tx" then
-    DebugTx=true
-  elseif Properties["Debug Print"].Value=="Rx" then
-    DebugRx=true
-  elseif Properties["Debug Print"].Value=="Function Calls" then
-    DebugFunction=true
-  elseif Properties["Debug Print"].Value=="All" then
-    DebugTx,DebugRx,DebugFunction=true,true,true
-    --DebugTx,DebugFunction=true,true,true
+  function SetupDebugPrint()
+    if Properties["Debug Print"].Value=="Tx/Rx" then
+      DebugTx,DebugRx=true,true
+    elseif Properties["Debug Print"].Value=="Tx" then
+      DebugTx=true
+    elseif Properties["Debug Print"].Value=="Rx" then
+      DebugRx=true
+    elseif Properties["Debug Print"].Value=="Function Calls" then
+      DebugFunction=true
+    elseif Properties["Debug Print"].Value=="All" then
+      DebugTx,DebugRx,DebugFunction=true,true,true
+      --DebugTx,DebugFunction=true,true,true
+    end
+    Controls.DebugFunction.Boolean = DebugFunction
+    Controls.DebugTx.Boolean = DebugTx
+    Controls.DebugRx.Boolean = DebugRx
   end
-  Controls.DebugFunction.Boolean = DebugFunction
-  Controls.DebugTx.Boolean = DebugTx
-  Controls.DebugRx.Boolean = DebugRx
+  SetupDebugPrint()
 
   Controls.DebugFunction.EventHandler = function(ctl) DebugFunction = ctl.Boolean end
   Controls.DebugTx.EventHandler = function(ctl) DebugTx = ctl.Boolean end
   Controls.DebugRx.EventHandler = function(ctl) DebugRx = ctl.Boolean end
-end
-SetupDebugPrint()
 
-obj = {}
-obj.TablePrint = function(tbl, indent)
-  if not indent then indent = 0 end 
-  --print('TablePrint type.'..type(tbl))
-  
-  local function LinePrint(k,v)
-      --print('LinePrint - type.'..type(v))
-      formatting = string.rep("  ", indent) .. k .. ": "
-      if type(v) == "table" then
-          print(formatting)
-          obj.TablePrint(v, indent+1)
-      elseif type(v) == 'string' or type(v) == 'boolean' or type(v) == 'number' then
-          print(formatting .. tostring(v))
-      --elseif type(v) == 'userdata' then
-      else
-          print(formatting .. 'Type.'..type(v))
-      end
-  end
-  
-  if type(tbl) == "table" then
-      for k, v in pairs(tbl) do LinePrint(k,v) end
-  elseif type(tbl) == "userdata" then
-      --for k, v in ipairs(tbl) do LinePrint(k,v) end
-      --print(table.concat)
-      pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
-      --print('33 TablePrint type.'..type(tbl))
-      --pcall(function() for k, v in ipairs(tbl) do LinePrint(k,v) end end)
-      --print('35 TablePrint type.'..type(tbl))
-  elseif type(tbl) == "string" then
-      LinePrint('Type.'..type(tbl), tbl)
-  else
-      print('TablePrint Type.'..type(tbl))
-  end
+  obj = {}
+  obj.TablePrint = function(tbl, indent)
+    if not indent then indent = 0 end 
+    --print('TablePrint type.'..type(tbl))
+    
+    local function LinePrint(k,v)
+        --print('LinePrint - type.'..type(v))
+        formatting = string.rep("  ", indent) .. k .. ": "
+        if type(v) == "table" then
+            print(formatting)
+            obj.TablePrint(v, indent+1)
+        elseif type(v) == 'string' or type(v) == 'boolean' or type(v) == 'number' then
+            print(formatting .. tostring(v))
+        --elseif type(v) == 'userdata' then
+        else
+            print(formatting .. 'Type.'..type(v))
+        end
+    end
+    
+    if type(tbl) == "table" then
+        for k, v in pairs(tbl) do LinePrint(k,v) end
+    elseif type(tbl) == "userdata" then
+        --for k, v in ipairs(tbl) do LinePrint(k,v) end
+        --print(table.concat)
+        pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
+        --print('33 TablePrint type.'..type(tbl))
+        --pcall(function() for k, v in ipairs(tbl) do LinePrint(k,v) end end)
+        --print('35 TablePrint type.'..type(tbl))
+    elseif type(tbl) == "string" then
+        LinePrint('Type.'..type(tbl), tbl)
+    else
+        print('TablePrint Type.'..type(tbl))
+    end
 end
 	-----------------------------------------------------------------------------------------------------------------------
 	-- Remote Q-Sys control functions
@@ -398,12 +398,14 @@ local function HandleRemoteControlsData(data) --{"Name":"FunctionMicGain_1","Con
 end
 
 function HandleRemoteComponentsData(data) -- [{"Name": "APM ABC", "Type": "apm", "Properties":[{"Name": "multi_channel_type","Value": "1"},]},]
-	if DebugFunction then print('HandleRemoteComponentsData, found '..#data..' RemoteComponents') end
-  RemoteComponents = data
- 	local choices = { [1]='' }
-	for _, v in ipairs(data) do table.insert(choices, v.Name) end
-	for i=1, Properties['Component Count'].Value do Controls.RemoteComponents[i].Choices = choices end
-	UpdateCommonComponents(RemoteComponents)
+	if DebugFunction then print('HandleRemoteComponentsData, found '..(data==nil and 'no data' or #data..' RemoteComponents')) end
+  if data~=nil then
+    RemoteComponents = data
+    local choices = { [1]='' }
+    for _, v in ipairs(data) do table.insert(choices, v.Name) end
+    for i=1, Properties['Component Count'].Value do Controls.RemoteComponents[i].Choices = choices end
+    UpdateCommonComponents(RemoteComponents)
+  end
 end
 
 local function HandleRemoteSubscriptionData(result, message)
@@ -484,10 +486,11 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
 					if messageIDs[messageId_] then
             local tbl_ = messageIDs[messageId_]
             if DebugFunction then log = log..', method:'..(tbl_.method or 'nil') end
+            if data.result==nil then if DebugFunction then print(log..' data.result is nil') log='' end end
             if tbl_.method == nil then 
               if DebugFunction then print(log) log = '' end
             elseif tbl_.method == "Logon" then 
-              LoggedIn(true)
+              LoggedIn(data.result)
             elseif tbl_.method == "Component.GetControls" then 
               HandleRemoteControlsData(data.result)
             elseif tbl_.method == "Component.GetComponents" then 
@@ -603,7 +606,7 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
       elseif type(data.result)=='boolean' then
         if DebugFunction then log = log..'\n result: '..tostring(data.result) end
         if data.result then  --{"jsonrpc":"2.0","result":true,"id":1}
-          LoggedIn(true)
+          LoggedIn(data.result)
         end
       elseif data.result then
         if data.result.Name then
@@ -671,17 +674,22 @@ local function RemoteComponentEvent(ctl, i)
   UpdateCommonControls(i)
 end
 
-local function SocketClosed()
-  ReportStatus("MISSING","Socket closed")
+local function LoggedOut()
   Controls.Platform.String = ''
   Controls.DesignName.String = ''
+  Controls.LoggedIn.Boolean = false 
   commandQueue = nil -- clear queue
   commandQueue = {}
   RemoteSubscriptions = nil -- clear queue
   RemoteSubscriptions = {}
   AutoPollInitiated = false
 end 
-  
+
+local function SocketClosed()
+  ReportStatus("MISSING","Socket closed")
+  LoggedOut()
+end 
+
 function Connect()
   if Controls.IPAddress.String == "" then
     --Controls.IPAddress.String = System.IsEmulating and "localhost" or Network.Interfaces()[1].Address
@@ -695,7 +703,7 @@ function Connect()
   end
   if DebugFunction then print('Connect('..Controls.IPAddress.String..':'..Controls.Port.String..') IsConnected: '..tostring(socket.IsConnected)) end
   if socket.IsConnected then
-    SocketClosed()
+    LoggedOut()
     socket:Disconnect()
   end
   socket:Connect(Controls.IPAddress.String, Controls.Port.Value)
@@ -793,13 +801,16 @@ function InitialiseCore()
     end
   end
 
+  Controls.Username.EventHandler = LoggedOut
+  Controls.Password.EventHandler = LoggedOut
+
   ReportStatus("INITIALIZING","Socket Initializing")
   Connect()
 end
 
------------------------------------------------------------------------------------------------------------------------
--- Component control functions
------------------------------------------------------------------------------------------------------------------------
+	-----------------------------------------------------------------------------------------------------------------------
+	-- Component control functions
+	-----------------------------------------------------------------------------------------------------------------------
 function InitialiseComponents()
 
   local function LocalComponentEvent(ctl, i)
@@ -850,14 +861,19 @@ function InitialiseComponents()
       table.insert(choices, v.Name)
       LocalComponents[v.Name] = Component.New(v.Name)
       LocalControls[v.Name] = Component.GetControls(LocalComponents[v.Name])
-      if DebugFunction then print('Component: "'..v.Name..'", Type: '..(v.Type or '')..' has '..#LocalControls[v.Name]..' controls') end
+      --if DebugFunction then print('Component: "'..v.Name..'", Type: '..(v.Type or '')..' has '..#LocalControls[v.Name]..' controls') end
+      if DebugFunction then print('Component: "'..v.Name..'" has '..#LocalControls[v.Name]..' controls') end
       for _,v1 in ipairs(LocalControls[v.Name]) do
-        --if DebugFunction then print('adding EventHandler for "'..v.Name..'"["'..tostring(v1.Name)..'"]') end
-        LocalComponents[v.Name][v1.Name].EventHandler = function(ctl)
-          local val = ctl.Type=='Text' and ctl.String or ctl.Value
-          if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
-          if DebugFunction then print('local '..ctl.Type..' event "'..v.Name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
-          SendEventToRemote(v.Name, v1.Name, val)
+        if LocalComponents[v.Name][v1.Name]==nil then
+          --if DebugFunction then print('NOT adding invalid EventHandler for "'..v.Name..'"["'..tostring(v1.Name)..'"]') end
+        else
+          if DebugFunction then print('adding EventHandler for "'..v.Name..'"["'..tostring(v1.Name)..'"]') end
+          LocalComponents[v.Name][v1.Name].EventHandler = function(ctl)
+            local val = ctl.Type=='Text' and ctl.String or ctl.Value
+            if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
+            if DebugFunction then print('local '..ctl.Type..' event "'..v.Name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
+            SendEventToRemote(v.Name, v1.Name, val)
+          end          
         end
       end
       local types = { -- for info only to use some other time
