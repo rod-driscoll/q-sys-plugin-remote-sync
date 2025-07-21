@@ -33,15 +33,20 @@ The files in "./DEV/" are for dev only and may not be the most current code, the
 
 ## Features
 
-For any component you want to sync between cores.
+Sync components between cores.\
+This will sync components from a remote core to the local core.\
+On connection the local components will be synched with the remote components.\
 
 1. Place a component in a remote core and give it script access of 'External' or 'All'.
-2. Copy and paste the component into the local core and make sure the local copy of the script has the same script ID and script access of 'Internal' or 'All'.
+2. Copy and paste the component into the local core and make sure the local copy of the script has script access of 'Internal' or 'All'.
 3. Repeat steps 1 and 2 for each component you want to sync between cores.
 4. Add this plugin to the local core.
 5. Enter the details of the remote core into this plugin.
 6. Run the system and select the systems you want to sync in the plugin.
 
+It is recommented to use the 'common components' drop down box and select components which have the same script ID on both the local and remote cores. It is possible to sync components with different script ID names by selecting the 'Local components' and 'remote component' combos.\
+If local and remote components are not the same type then it will sync all controls with the same name if possible.\
+Only writable controls can be synched, e.g. it won't sync the status control of devices.\
 
 ## Changelog
 
