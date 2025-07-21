@@ -51,8 +51,8 @@ if(CurrentPage == 'Setup') then
   table.insert(graphics,{Type="Text",Text=GetPrettyName(),Position={15,200},Size={380,14},FontSize=10,HTextAlign="Right", Color=colors.Gray})
 
 elseif(CurrentPage == 'System') then 
-  table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
-  layout["LoadComponents"] = {PrettyName="Settings~LoadComponents"  ,Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
+  --table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  --layout["LoadComponents"] = {PrettyName="Settings~LoadComponents"  ,Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
   table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
   layout["DebugFunction"] = {PrettyName="Settings~DebugFunction"    ,Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
   table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
@@ -68,7 +68,7 @@ elseif(CurrentPage == 'Devices') then
     {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
     {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
     {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
-    {Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
+    --{Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
   }
   local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
   local h = 28
