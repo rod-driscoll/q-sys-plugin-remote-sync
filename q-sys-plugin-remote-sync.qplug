@@ -329,12 +329,12 @@ function GetControlLayout(props)
    
   elseif(CurrentPage == 'Devices') then
     local columns_ = {
+      {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
       {Title="Local components" , Id="LocalComponents" ,Position={ 10,  5}, Cell={Style="ComboBox"}},
       {Title="Remote components", Id="RemoteComponents",Position={154,  5}, Cell={Style="ComboBox"}},
-      {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
+      {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
       {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
       {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
-      {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
       --{Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
     }
     local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
@@ -442,10 +442,9 @@ if Controls then
     elseif type(tbl) == "userdata" then
         --for k, v in ipairs(tbl) do LinePrint(k,v) end
         --print(table.concat)
-        pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
+        local success, err = pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
         --print('33 TablePrint type.'..type(tbl))
         --pcall(function() for k, v in ipairs(tbl) do LinePrint(k,v) end end)
-        --print('35 TablePrint type.'..type(tbl))
     elseif type(tbl) == "string" then
         LinePrint('Type.'..type(tbl), tbl)
     else
@@ -667,17 +666,40 @@ if Controls then
     end
   end
   
-  local function UpdateCommonControls(i)
-    local remote_name = Controls.RemoteComponents[i].String
-    print('UpdateCommonControls('..i..') "'..remote_name..'"')
-    local choices = {[1]= ''}
-    for _,v in ipairs(Controls.LocalControls[i].Choices) do
-      for _,v1 in ipairs(Controls.RemoteControls[i].Choices) do
-        if v~='' and v1~='' and v==v1 then
-          table.insert(choices, v)
-        end
+  function array_intersection(table1, table2) -- returns the intersection of two arrays (elements present in both)
+    local lookup = {}
+    local result = {}
+    local index = 1
+    for _, value in ipairs(table1) do lookup[value] = true end -- Create lookup table from table1
+    -- Check table2 elements against lookup, avoid duplicates
+    local seen = {}
+    for _, value in ipairs(table2) do
+      if lookup[value] and not seen[value] then
+        seen[value] = true
+        result[index] = value
+        index = index + 1
       end
     end
+    return result
+  end
+  
+  local function UpdateCommonControls(i)
+    local remote_name = Controls.RemoteComponents[i].String
+    --local max = 8880 -- Max execution error at this amount of comparisons
+    print('UpdateCommonControls('..i..') "'..remote_name..'"')
+    local choices = {[1]= ''}
+    local lookup = {}
+    for _,v in pairs(Controls.LocalControls[i].Choices) do 
+      if v~='' then lookup[v] = true end -- Create lookup table
+    end
+    local seen = {} -- avoid repeats
+    for _,v in ipairs(Controls.RemoteControls[i].Choices) do
+      if v~='' and lookup[v] and not seen[v] then
+        seen[v] = true
+        table.insert(choices, v)
+      end
+    end
+  
     Controls.CommonControls[i].String = ''
     Controls.CommonControls[i].Choices = choices
   
@@ -702,7 +724,7 @@ if Controls then
       local remote_controls = {}
       for _,v in ipairs(choices) do -- only subscribe to controls if not already subscribed
         if v~='' and not RemoteSubscriptions[remote_name][v] then 
-          if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
+          --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
           table.insert(remote_controls, {["Name"]=v}) 
         else
           --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..v..'"] already subscribed') end
@@ -897,6 +919,8 @@ if Controls then
                 HandleRemoteSubscriptionData(data.result, tbl_)
               elseif tbl_.method == "ChangeGroup.AutoPoll" then
                 AutoPollInitiated = data.result
+              elseif tbl_.method == "Component.Set" then 
+                --HandleRemoteComponentSet(data.result) -- not handled. If it failed it'll sync on the next AutoPoll            
               else
                 if DebugFunction then log = log..'\n message method "'..tbl_.method..'" not handled' end
               end
@@ -966,17 +990,20 @@ if Controls then
                   end 
                   -- subscribers in this plugin
                   for i=1, Properties['Component Count'].Value do
-                    if DebugFunction then print('Checking RemoteComponents['..i..']') end
+                    --if DebugFunction then print('Checking RemoteComponents['..i..']') end
                     if Controls.RemoteComponents[i].String == change_.Component then
                       if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]: '..tostring(change_.Value)) end
                       local local_ = LocalComponents[Controls.LocalComponents[i].String]
                       if local_ and local_[change_.Name] then
                         if DebugFunction then print('LocalComponents["'..Controls.LocalComponents[i].String..'"]["'..change_.Name..'"] exists') end
                         for k1, v1 in pairs(change_) do
-                          if k1~='Component' and k1~='Name' and k1~='Direction' and (not local_[change_.Name].Direction or local_[change_.Name].Direction:match('Write')) and local_[change_.Name][k1] then
-                            --if DebugFunction then print('Updating LocalComponents["'..change_.Component..'"]["'..change_.Name..'"]["'..k1..'"]: '..tostring(v1)) end
-                            local_[change_.Name][k1] = v1
-                          end
+                          local success, msg = pcall(function() 
+                              if k1~='Component' and k1~='Name' and k1~='Direction' and (not local_[change_.Name].Direction or local_[change_.Name].Direction:match('Write')) and local_[change_.Name][k1] then
+                                --if DebugFunction then print('Updating LocalComponents["'..change_.Component..'"]["'..change_.Name..'"]["'..k1..'"]: '..tostring(v1)) end
+                                local_[change_.Name][k1] = v1
+                              end
+                            end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
+                          --if not success and DebugFunction then print('local "'..change_.Name..'"["'..k1..'"] error\n'..msg) end
                         end
                       end
                     end
@@ -1069,6 +1096,7 @@ if Controls then
       end
       SendData('Component.GetControls', {["Name"]=ctl.String})
     end
+    -- WARNING: if too many controls are defined there will be a max execution error here
     UpdateCommonControls(i)
   end
   
@@ -1162,7 +1190,7 @@ if Controls then
         local tbl, raw, err = GetRxBufferBlock()
         if not tbl then 
           if DebugFunction then 
-            if err then print(err)
+            if err then --print(err)
             else        print('done parsing buffer #'..#rxBuffer..', raw #'..(raw and #raw or 0)) end
           end
           break
@@ -1253,7 +1281,7 @@ if Controls then
           LocalControls[local_component_name] = ctls 
           for _,v1 in ipairs(ctls) do
             if LocalComponents[local_component_name][v1.Name]~=nil then
-              if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
+              --if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
               LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)   
                 local val = ctl.Type=='Text' and local_component_name or ctl.Value
                 if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
@@ -1314,8 +1342,8 @@ if Controls then
           RemoteComponentEvent(Controls.RemoteComponents[i], i)
         end 
         -- updade component lists
-        LocalComponentEvent(Controls.LocalComponents[i], i)
-        RemoteComponentEvent(Controls.RemoteComponents[i], i)
+        if Controls.LocalComponents[i].String  ~= '' then LocalComponentEvent(Controls.LocalComponents[i], i) end
+        if Controls.RemoteComponents[i].String ~= '' then RemoteComponentEvent(Controls.RemoteComponents[i], i) end
   
         Controls.SyncComponent[i].EventHandler = function(ctl)
           --print('SyncComponent['..i..'] event '..tostring(ctl.Boolean))
