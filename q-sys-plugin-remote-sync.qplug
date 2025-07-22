@@ -395,62 +395,62 @@ if Controls then
   -------------------------------------------------------------------------------------------------------------------
   -- A function to determine common print statement scenarios for troubleshooting
   -- A function to determine common print statement scenarios for troubleshooting
-    function SetupDebugPrint()
-      if Properties["Debug Print"].Value=="Tx/Rx" then
-        DebugTx,DebugRx=true,true
-      elseif Properties["Debug Print"].Value=="Tx" then
-        DebugTx=true
-      elseif Properties["Debug Print"].Value=="Rx" then
-        DebugRx=true
-      elseif Properties["Debug Print"].Value=="Function Calls" then
-        DebugFunction=true
-      elseif Properties["Debug Print"].Value=="All" then
-        DebugTx,DebugRx,DebugFunction=true,true,true
-        --DebugTx,DebugFunction=true,true,true
-      end
-      Controls.DebugFunction.Boolean = DebugFunction
-      Controls.DebugTx.Boolean = DebugTx
-      Controls.DebugRx.Boolean = DebugRx
+  function SetupDebugPrint()
+    if Properties["Debug Print"].Value=="Tx/Rx" then
+      DebugTx,DebugRx=true,true
+    elseif Properties["Debug Print"].Value=="Tx" then
+      DebugTx=true
+    elseif Properties["Debug Print"].Value=="Rx" then
+      DebugRx=true
+    elseif Properties["Debug Print"].Value=="Function Calls" then
+      DebugFunction=true
+    elseif Properties["Debug Print"].Value=="All" then
+      DebugTx,DebugRx,DebugFunction=true,true,true
+      --DebugTx,DebugFunction=true,true,true
     end
-    SetupDebugPrint()
+    Controls.DebugFunction.Boolean = DebugFunction
+    Controls.DebugTx.Boolean = DebugTx
+    Controls.DebugRx.Boolean = DebugRx
   
     Controls.DebugFunction.EventHandler = function(ctl) DebugFunction = ctl.Boolean end
     Controls.DebugTx.EventHandler = function(ctl) DebugTx = ctl.Boolean end
     Controls.DebugRx.EventHandler = function(ctl) DebugRx = ctl.Boolean end
+  end
+  SetupDebugPrint()
   
-    obj = {}
-    obj.TablePrint = function(tbl, indent)
-      if not indent then indent = 0 end 
-      --print('TablePrint type.'..type(tbl))
-      
-      local function LinePrint(k,v)
-          --print('LinePrint - type.'..type(v))
-          formatting = string.rep("  ", indent) .. k .. ": "
-          if type(v) == "table" then
-              print(formatting)
-              obj.TablePrint(v, indent+1)
-          elseif type(v) == 'string' or type(v) == 'boolean' or type(v) == 'number' then
-              print(formatting .. tostring(v))
-          --elseif type(v) == 'userdata' then
-          else
-              print(formatting .. 'Type.'..type(v))
-          end
-      end
-      
-      if type(tbl) == "table" then
-          for k, v in pairs(tbl) do LinePrint(k,v) end
-      elseif type(tbl) == "userdata" then
-          --for k, v in ipairs(tbl) do LinePrint(k,v) end
-          --print(table.concat)
-          pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
-          --print('33 TablePrint type.'..type(tbl))
-          --pcall(function() for k, v in ipairs(tbl) do LinePrint(k,v) end end)
-          --print('35 TablePrint type.'..type(tbl))
-      elseif type(tbl) == "string" then
-          LinePrint('Type.'..type(tbl), tbl)
-      else
-          print('TablePrint Type.'..type(tbl))
-      end
+  obj = {}
+  obj.TablePrint = function(tbl, indent)
+    if not indent then indent = 0 end 
+    --print('TablePrint type.'..type(tbl))
+    
+    local function LinePrint(k,v)
+        --print('LinePrint - type.'..type(v))
+        formatting = string.rep("  ", indent) .. k .. ": "
+        if type(v) == "table" then
+            print(formatting)
+            obj.TablePrint(v, indent+1)
+        elseif type(v) == 'string' or type(v) == 'boolean' or type(v) == 'number' then
+            print(formatting .. tostring(v))
+        --elseif type(v) == 'userdata' then
+        else
+            print(formatting .. 'Type.'..type(v))
+        end
+    end
+    
+    if type(tbl) == "table" then
+        for k, v in pairs(tbl) do LinePrint(k,v) end
+    elseif type(tbl) == "userdata" then
+        --for k, v in ipairs(tbl) do LinePrint(k,v) end
+        --print(table.concat)
+        pcall(function() print(tostring(tbl)) for k, v in pairs(tbl) do LinePrint(k,v) end end)
+        --print('33 TablePrint type.'..type(tbl))
+        --pcall(function() for k, v in ipairs(tbl) do LinePrint(k,v) end end)
+        --print('35 TablePrint type.'..type(tbl))
+    elseif type(tbl) == "string" then
+        LinePrint('Type.'..type(tbl), tbl)
+    else
+        print('TablePrint Type.'..type(tbl))
+    end
   end
   	-----------------------------------------------------------------------------------------------------------------------
   	-- Remote Q-Sys control functions
@@ -565,7 +565,7 @@ if Controls then
     elseif first_json_pos > 1 then
       str = str:sub(first_json_pos) -- Trim leading garbage
       rxBuffer = str
-      print('GetRxBufferBlock lead trimmed new(#'..#rxBuffer..')')
+      --if DebugFunction then print('GetRxBufferBlock lead trimmed '..first_json_pos..', new buffer size #'..#rxBuffer) end
     end
     
     local start, finish, candidate = str:find("(%b{})")  -- Try to find the first balanced JSON object or array
@@ -686,7 +686,18 @@ if Controls then
         if DebugFunction then print('Creating RemoteSubscriptions["'..remote_name..'"]') end
         RemoteSubscriptions[remote_name] = {} 
       else
-        if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"] has '..#RemoteSubscriptions[remote_name]..' controls') end
+        if DebugFunction then 
+          if #RemoteSubscriptions[remote_name]==0 then
+          local count=0
+            for i1,v1 in pairs(RemoteSubscriptions[remote_name]) do
+              --print('RemoteSubscriptions["'..remote_name..'"]['..i1..']: '..tostring(v1))
+              count=count+1
+            end
+            print('RemoteSubscriptions["'..remote_name..'"] has '..count..' controls')
+          else
+            print('RemoteSubscriptions["'..remote_name..'"] has '..#RemoteSubscriptions[remote_name]..' controls')
+          end
+        end
       end
       local remote_controls = {}
       for _,v in ipairs(choices) do -- only subscribe to controls if not already subscribed
@@ -694,10 +705,10 @@ if Controls then
           if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
           table.insert(remote_controls, {["Name"]=v}) 
         else
-          if DebugFunction then print('NOT adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
+          --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..v..'"] already subscribed') end
         end
       end
-      -- subscribe to controls - TODO: optimise this by keeping track of subscriptions and not re-sending
+      -- subscribe to controls 
       if DebugFunction then print('Subscribing to remote['..i..'] "'..remote_name..'" has '..#remote_controls..' remote controls from '..#choices..' common controls') end
       if #remote_controls>0 then
         SendData('ChangeGroup.AddComponentControl', {
@@ -764,16 +775,20 @@ if Controls then
   end
   
   local function HandleRemoteControlsData(data) --{"Name":"FunctionMicGain_1","Controls":[{"Name":"bypass","Type":"Boolean","Value":false,"String":"no","Position":0.0,"Direction":"Read/Write"},{"Name":"gain","Type":"Float","Value":0.0,"ValueMin":-21.0,"ValueMax":0.0,"StringMin":"-21.0dB","StringMax":"0dB","String":"0dB","Position":1.0,"Direction":"Read/Write"},{"Name":"invert","Type":"Boolean","Value":false,"String":"normal","Position":0.0,"Direction":"Read/Write"},{"Name":"mute","Type":"Boolean","Value":true,"String":"muted","Position":1.0,"Direction":"Read/Write"}]}
-    RemoteControls[data.Name] = data.Controls
-    if DebugFunction then  print('HandleRemoteControlsData["'..data.Name.. '"] has '..#data.Controls..' controls') end
-    local choices = { [1]= '' }
-    for _,j in ipairs(data.Controls) do table.insert(choices, j.Name) end
-  	for i=1, Properties['Component Count'].Value do
-      if Controls.RemoteComponents[i].String == data.Name then
-        if DebugFunction then print('Populating RemoteComponents['..i..'] with RemoteControls["'..data.Name..'"], '..#RemoteControls[data.Name]..' controls') end
-        Controls.RemoteControls[i].Choices = choices
-        UpdateCommonControls(i)
-        SyncComponent(i)
+    if type(data)~='table' then
+      if DebugFunction then  print("HandleRemoteControlsData, invalid data type: "..type(data)) end
+    else
+      RemoteControls[data.Name] = data.Controls
+      if DebugFunction then  print('HandleRemoteControlsData["'..data.Name.. '"] has '..#data.Controls..' controls') end
+      local choices = { [1]= '' }
+      for _,j in ipairs(data.Controls) do table.insert(choices, j.Name) end
+      for i=1, Properties['Component Count'].Value do
+        if Controls.RemoteComponents[i].String == data.Name then
+          if DebugFunction then print('Populating RemoteComponents['..i..'] with RemoteControls["'..data.Name..'"], '..#RemoteControls[data.Name]..' controls') end
+          Controls.RemoteControls[i].Choices = choices
+          UpdateCommonControls(i)
+          SyncComponent(i)
+        end
       end
     end
   end
@@ -866,10 +881,12 @@ if Controls then
             if DebugFunction then log = log..'\n response for this plugin, messageId: '..messageId_..', type: '..type(messageId_) end
   					if messageIDs[messageId_] then
               local tbl_ = messageIDs[messageId_]
-              if DebugFunction then log = log..', method:'..(tbl_.method or 'nil') end
-              if data.result==nil then if DebugFunction then print(log..' data.result is nil') log='' end end
-              if tbl_.method == nil then 
-                if DebugFunction then print(log) log = '' end
+              if DebugFunction then
+                log = log..', method:'..(tbl_.method or 'nil') 
+                if data.result==nil then print(log..' data.result is nil') log='' end
+                if tbl_.method==nil then print(log..' tbl_.method is nil') log='' end
+              end
+              if tbl_.method==nil then --
               elseif tbl_.method == "Logon" then 
                 LoggedIn(data.result)
               elseif tbl_.method == "Component.GetControls" then 
@@ -1061,7 +1078,7 @@ if Controls then
     Controls.LoggedIn.Boolean = false 
     commandQueue = nil -- clear queue
     commandQueue = {}
-    RemoteSubscriptions = nil -- clear queue
+    RemoteSubscriptions = nil -- clear
     RemoteSubscriptions = {}
     AutoPollInitiated = false
   end 
@@ -1070,7 +1087,7 @@ if Controls then
     ReportStatus("MISSING","Socket closed")
     LoggedOut()
   end 
-  
+    
   function Connect()
     if Controls.IPAddress.String == "" then
       --Controls.IPAddress.String = System.IsEmulating and "localhost" or Network.Interfaces()[1].Address
@@ -1189,29 +1206,11 @@ if Controls then
     Connect()
   end
   
-  	-----------------------------------------------------------------------------------------------------------------------
-  	-- Component control functions
-  	-----------------------------------------------------------------------------------------------------------------------
+  -----------------------------------------------------------------------------------------------------------------------
+  -- Component control functions
+  -----------------------------------------------------------------------------------------------------------------------
   function InitialiseComponents()
   
-    local function LocalComponentEvent(ctl, i)
-      if ctl.String == '' then 
-        Controls.LocalControls[i].Choices  = {}
-        Controls.CommonControls[i].Choices = {}
-      else
-        local cmp = Component.New(ctl.String)
-        local ctls = Component.GetControls(cmp)
-        print('Local component['..i..'] selected "'..ctl.String..'", has '..#ctls..' controls')
-        local choices_ = { [1]='' }
-        for i1,v1 in pairs(ctls) do 
-          --print(i1..': '..v1.Name)
-          table.insert(choices_, v1.Name)
-        end
-        Controls.LocalControls[i].Choices = choices_
-        UpdateCommonControls(i)
-      end
-    end
-    
     local function SendEventToRemote(component_name, control_name, value)
       for i,v in ipairs(Controls.LocalComponents) do
         if v.String == component_name then -- send to the remote
@@ -1234,29 +1233,48 @@ if Controls then
         end
       end
     end 
-      
+  
+    local function LocalComponentEvent(local_component_combo, i)
+      local local_component_name = local_component_combo.String
+      if local_component_name == '' then 
+        Controls.LocalControls[i].Choices  = {}
+        Controls.CommonControls[i].Choices = {}
+      else
+        local cmp = Component.New(local_component_name)
+        local ctls = Component.GetControls(cmp)
+        print('Local component['..i..'] selected "'..local_component_name..'", has '..#ctls..' controls')
+        local choices_ = { [1]='' }
+        for _,v1 in pairs(ctls) do table.insert(choices_, v1.Name) end       
+        -- Define control EventHandler on demand if not already defined (prevents Max execution error)
+        if LocalControls[local_component_name] then
+          if DebugFunction then print('control EventHandlers for "'..local_component_name..'" are already defined') end
+        else
+          if DebugFunction then print('Adding control EventHandlers for "'..local_component_name..'"') end
+          LocalControls[local_component_name] = ctls 
+          for _,v1 in ipairs(ctls) do
+            if LocalComponents[local_component_name][v1.Name]~=nil then
+              if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
+              LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)   
+                local val = ctl.Type=='Text' and local_component_name or ctl.Value
+                if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
+                if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
+                SendEventToRemote(local_component_name, v1.Name, val)
+              end
+            end
+          end  
+        end
+        Controls.LocalControls[i].Choices = choices_
+        UpdateCommonControls(i)
+        SendData('Component.GetControls', {["Name"]=Controls.RemoteComponents[i].String}) -- refresh remote data to sync with
+      end
+    end
+  
     local function GetLocalComponents()
       if DebugFunction then print('GetLocalComponents()') end
       local choices = { [1] = '' }
       for i,v in pairs(Component.GetComponents()) do
         table.insert(choices, v.Name)
         LocalComponents[v.Name] = Component.New(v.Name)
-        LocalControls[v.Name] = Component.GetControls(LocalComponents[v.Name])
-        --if DebugFunction then print('Component: "'..v.Name..'", Type: '..(v.Type or '')..' has '..#LocalControls[v.Name]..' controls') end
-        if DebugFunction then print('Component: "'..v.Name..'" has '..#LocalControls[v.Name]..' controls') end
-        for _,v1 in ipairs(LocalControls[v.Name]) do
-          if LocalComponents[v.Name][v1.Name]==nil then
-            --if DebugFunction then print('NOT adding invalid EventHandler for "'..v.Name..'"["'..tostring(v1.Name)..'"]') end
-          else
-            if DebugFunction then print('adding EventHandler for "'..v.Name..'"["'..tostring(v1.Name)..'"]') end
-            LocalComponents[v.Name][v1.Name].EventHandler = function(ctl)
-              local val = ctl.Type=='Text' and ctl.String or ctl.Value
-              if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
-              if DebugFunction then print('local '..ctl.Type..' event "'..v.Name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
-              SendEventToRemote(v.Name, v1.Name, val)
-            end          
-          end
-        end
         local types = { -- for info only to use some other time
             'gain', 'device_controller_script', 'usb_telephony', 'usb_ccontrols', 'usb_keyboard',
             'lightbar', 'touchscreen_sensors', 'spe_uci', 'snapshot_controller',
