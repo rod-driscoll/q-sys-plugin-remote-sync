@@ -50,7 +50,11 @@ Only writable controls can be synched, e.g. it won't sync the status control of 
 
 ### Possible future updates
 
-* 
+* The ability to select controls within each component and set them from the plugin.
+* The ability to exclude individual controls from synching.
+* It currently synchs from remote to local on connect. It could be configured to synch local to remote instead or not synch at all.
+* A button to clear all components.
+* Filters for component type.
 
 ## Changelog
 
