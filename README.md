@@ -44,9 +44,17 @@ On connection the local components will be synched with the remote components.\
 5. Enter the details of the remote core into this plugin.
 6. Run the system and select the systems you want to sync in the plugin.
 
-It is recommented to use the 'common components' drop down box and select components which have the same script ID on both the local and remote cores. It is possible to sync components with different script ID names by selecting the 'Local components' and 'remote component' combos.\
-If local and remote components are not the same type then it will sync all controls with the same name if possible.\
-Only writable controls can be synched, e.g. it won't sync the status control of devices.\
+### Items of note
+
+It is recommented to use the 'common components' drop down box and select components which have the same script ID on both the local and remote cores. It is possible to sync components with different script ID names by selecting the 'Local components' and 'remote component' combos.
+
+If local and remote components are not the same type then it will sync all controls with the same name if possible.
+
+Only writable controls can be synched, e.g. it won't sync the status control of devices.
+
+If the 'code' control on a script is synchronised then it causes problems with the same code running on both systems. When synchronising scripts it is best to copy the remote script into the local system and delete the script code in the local script so that only user controls events are syncronised and the code is ony running on the remote script, for this reason the 'code' control is not synchronised to the local system. Beware that if you modify the code on a local script at run time then that change will be sent to the remote script overwriting it, this is to enable deploying code to scripts remotely.
+
+Synchronising plugins has not been tested, if you wish to synchronise a plugin then it is best to sync a remote plugin with a script on the local system, add controls to the local script with the same names as the controls you want to synch and do not add any code to the local script.
 
 ### Possible future updates
 
@@ -55,6 +63,8 @@ Only writable controls can be synched, e.g. it won't sync the status control of 
 * It currently synchs from remote to local on connect. It could be configured to synch local to remote instead or not synch at all.
 * A button to clear all components.
 * Filters for component type.
+* Controls to enable/disable synchronising script 'code'.
+* Look into the best way to handle plugin synchronisation.
 
 ## Changelog
 
