@@ -386,6 +386,11 @@ if Controls then
   -----------------------------------------------------------------------------------------------------------------------
   -- Variables
   -----------------------------------------------------------------------------------------------------------------------
+  local DisablePullingScriptCode = true -- scripts will screw up if you pull the code from scripts and overwrite/run it on the local core
+  local DisableSubscribingToScriptCode = true 
+  local DisablePushingScriptCode = false -- TODO: make these variables run time editable
+  
+  
   local DebugTx=Controls.DebugTx.Boolean
   local DebugRx=Controls.DebugRx.Boolean
   local DebugFunction=Controls.DebugFunction.Boolean
@@ -451,9 +456,9 @@ if Controls then
         print('TablePrint Type.'..type(tbl))
     end
   end
-  	-----------------------------------------------------------------------------------------------------------------------
-  	-- Remote Q-Sys control functions
-  	-----------------------------------------------------------------------------------------------------------------------
+  -----------------------------------------------------------------------------------------------------------------------
+  -- Remote Q-Sys control functions
+  -----------------------------------------------------------------------------------------------------------------------
   local messageId = 1
   
   socket = TcpSocket.New()
@@ -724,8 +729,12 @@ if Controls then
       local remote_controls = {}
       for _,v in ipairs(choices) do -- only subscribe to controls if not already subscribed
         if v~='' and not RemoteSubscriptions[remote_name][v] then 
-          --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
-          table.insert(remote_controls, {["Name"]=v}) 
+          if v=='code' and DisableSubscribingToScriptCode then 
+            if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
+          else
+            --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
+            table.insert(remote_controls, {["Name"]=v}) 
+          end
         else
           --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..v..'"] already subscribed') end
         end
@@ -763,7 +772,7 @@ if Controls then
     if #Component.GetControls(local_)>0 then
       --{"FunctionMicGain_1":[{"Name":"bypass","Type":"Boolean","Value":false,"String":"no","Position":0.0,"Direction":"Read/Write"},{"Name":"gain","Type":"Float","Value":0.0,"ValueMin":-21.0,"ValueMax":0.0,"StringMin":"-21.0dB","StringMax":"0dB","String":"0dB","Position":1.0,"Direction":"Read/Write"},{"Name":"invert","Type":"Boolean","Value":false,"String":"normal","Position":0.0,"Direction":"Read/Write"},{"Name":"mute","Type":"Boolean","Value":true,"String":"muted","Position":1.0,"Direction":"Read/Write"}]}
       for _,v in ipairs(Controls.CommonControls[i].Choices) do -- assuming CommonControls is already updated
-        if v~='' then
+        if v~='' and not (v=='code' and DisablePullingScriptCode) then -- ignore blank and script 'code'
           for _,v1 in ipairs(remoteControls_) do
             if v1.Name == v and local_[v] and (not local_[v].Direction or local_[v].Direction:match('Write')) then -- "Name":"bypass"
               if DebugFunction then print('Synching "'..v..'" ("Value":"'..tostring(v1.Value)..'")') end
@@ -992,18 +1001,22 @@ if Controls then
                   for i=1, Properties['Component Count'].Value do
                     --if DebugFunction then print('Checking RemoteComponents['..i..']') end
                     if Controls.RemoteComponents[i].String == change_.Component then
-                      if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]: '..tostring(change_.Value)) end
-                      local local_ = LocalComponents[Controls.LocalComponents[i].String]
-                      if local_ and local_[change_.Name] then
-                        if DebugFunction then print('LocalComponents["'..Controls.LocalComponents[i].String..'"]["'..change_.Name..'"] exists') end
-                        for k1, v1 in pairs(change_) do
-                          local success, msg = pcall(function() 
+                      if change_.Name=='code' and DisablePullingScriptCode then -- ignore script 'code'
+                        if DebugFunction then print('not synching ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]') end
+                      else
+                        if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]: '..tostring(change_.Value)) end
+                        local local_ = LocalComponents[Controls.LocalComponents[i].String]
+                        if local_ and local_[change_.Name] then
+                          if DebugFunction then print('LocalComponents["'..Controls.LocalComponents[i].String..'"]["'..change_.Name..'"] exists') end
+                          for k1, v1 in pairs(change_) do
+                            local success, msg = pcall(function() 
                               if k1~='Component' and k1~='Name' and k1~='Direction' and (not local_[change_.Name].Direction or local_[change_.Name].Direction:match('Write')) and local_[change_.Name][k1] then
                                 --if DebugFunction then print('Updating LocalComponents["'..change_.Component..'"]["'..change_.Name..'"]["'..k1..'"]: '..tostring(v1)) end
                                 local_[change_.Name][k1] = v1
                               end
                             end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-                          --if not success and DebugFunction then print('local "'..change_.Name..'"["'..k1..'"] error\n'..msg) end
+                            --if not success and DebugFunction then print('local "'..change_.Name..'"["'..k1..'"] error\n'..msg) end
+                          end
                         end
                       end
                     end
@@ -1240,6 +1253,7 @@ if Controls then
   function InitialiseComponents()
   
     local function SendEventToRemote(component_name, control_name, value)
+  
       for i,v in ipairs(Controls.LocalComponents) do
         if v.String == component_name then -- send to the remote
           local remote_mame = Controls.RemoteComponents[i].String
@@ -1283,10 +1297,19 @@ if Controls then
             if LocalComponents[local_component_name][v1.Name]~=nil then
               --if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
               LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)   
-                local val = ctl.Type=='Text' and local_component_name or ctl.Value
-                if ctl.Type=='Boolean' then val = ctl.Boolean end -- can't do this in a ternary because a boolean can be false
-                if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
-                SendEventToRemote(local_component_name, v1.Name, val)
+                local val = ctl.Type=='Text' and ctl.String or ctl.Value
+                if ctl.Type=='Boolean' then val = ctl.Boolean -- can't do this in a ternary because a boolean can be false
+                elseif ctl.Type=='Trigger' then val = ctl.Boolean -- Triggers aren't really supported in QSC protocol
+                end -- can't do this in a ternary because a boolean can be false
+                if v1.Name=='code' and DisablePushingScriptCode then 
+                   if DebugFunction then print('not sending local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]')  end
+                else
+                  if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
+                  if ctl.Type=='Trigger' then
+                    SendEventToRemote(local_component_name, v1.Name, 'trigger')
+                  end
+                  SendEventToRemote(local_component_name, v1.Name, val)
+                end
               end
             end
           end  
