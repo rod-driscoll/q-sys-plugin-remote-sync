@@ -62,12 +62,12 @@ elseif(CurrentPage == 'System') then
  
 elseif(CurrentPage == 'Devices') then
   local columns_ = {
+    {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
     {Title="Local components" , Id="LocalComponents" ,Position={ 10,  5}, Cell={Style="ComboBox"}},
     {Title="Remote components", Id="RemoteComponents",Position={154,  5}, Cell={Style="ComboBox"}},
-    {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
+    {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
     {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
     {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
-    {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
     --{Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
   }
   local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
