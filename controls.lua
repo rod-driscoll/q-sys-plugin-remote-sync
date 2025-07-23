@@ -32,6 +32,30 @@ table.insert(ctrls, {
   UserPin      = true,
   Count        = 1
 })
+table.insert(ctrls, {
+  Name         = "EnablePushingCode",
+  ControlType  = "Button",
+  ButtonType   = "Toggle",
+  PinStyle     = "Input",
+  UserPin      = true,
+  Count        = 1
+})
+table.insert(ctrls, {
+  Name         = "EnablePullingCode",
+  ControlType  = "Button",
+  ButtonType   = "Toggle",
+  PinStyle     = "Input",
+  UserPin      = true,
+  Count        = 1
+})
+table.insert(ctrls, {
+  Name         = "ClearLocalCode",
+  ControlType  = "Button",
+  ButtonType   = "Toggle",
+  PinStyle     = "Input",
+  UserPin      = true,
+  Count        = 1
+})
 
 -- Configuration Controls --
 table.insert(ctrls, {
@@ -191,6 +215,6 @@ table.insert(ctrls, {
   ControlType  = "Button",
   ButtonType   = "Toggle",
   PinStyle     = "Input",
-  UserPin      = true,
+  UserPin      = false,
   Count        = props['Component Count'].Value
 })

@@ -29,7 +29,7 @@ if(CurrentPage == 'Setup') then
 
   table.insert(graphics,{Type="Text",Text="Username"      ,Position={ 15,55},Size={100,16},FontSize=14,HTextAlign="Right"})
   layout["Username"] = {PrettyName="Settings~Username"    ,Position={120,55},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
-  
+
   table.insert(graphics,{Type="Text",Text="Password"      ,Position={ 15,75},Size={100,16},FontSize=14,HTextAlign="Right"})
   layout["Password"] = {PrettyName="Settings~Password"    ,Position={120,75},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
 
@@ -51,14 +51,21 @@ if(CurrentPage == 'Setup') then
   table.insert(graphics,{Type="Text",Text=GetPrettyName(),Position={15,200},Size={380,14},FontSize=10,HTextAlign="Right", Color=colors.Gray})
 
 elseif(CurrentPage == 'System') then 
-  --table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
-  --layout["LoadComponents"] = {PrettyName="Settings~LoadComponents"  ,Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
-  table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
-  layout["DebugFunction"] = {PrettyName="Settings~DebugFunction"    ,Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
-  table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
-  layout["DebugTx"] = {PrettyName="Settings~DebugTx"                ,Position={146, 37},Size={ 36, 16},FontSize=12,Style="Button"}
-  table.insert(graphics,{Type="Text",Text="Debug Rx"                ,Position={ 10, 53},Size={135, 16},FontSize=14,HTextAlign="Left"})
-  layout["DebugRx"] = {PrettyName="Settings~DebugRx"                ,Position={146, 53},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Enable pulling code"           ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["EnablePullingCode"] = {PrettyName="Settings~Enable pulling code",Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Enable pushing code"           ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["EnablePushingCode"] = {PrettyName="Settings~Enable pushing code",Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Clear local code"              ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["ClearLocalCode"] = {PrettyName="Settings~Clear local code"      ,Position={146, 37},Size={ 36, 16},FontSize=12,Style="Button"}
+  
+  --table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10, 53},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  --layout["LoadComponents"] = {PrettyName="Settings~Load components" ,Position={146, 53},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 69},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["DebugFunction"] = {PrettyName="Settings~Debug Function"   ,Position={146, 69},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 85},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["DebugTx"] = {PrettyName="Settings~Debug Tx"               ,Position={146, 85},Size={ 36, 16},FontSize=12,Style="Button"}
+  table.insert(graphics,{Type="Text",Text="Debug Rx"                ,Position={ 10,101},Size={135, 16},FontSize=14,HTextAlign="Left"})
+  layout["DebugRx"] = {PrettyName="Settings~Debug Rx"               ,Position={146,101},Size={ 36, 16},FontSize=12,Style="Button"}
  
 elseif(CurrentPage == 'Devices') then
   local columns_ = {

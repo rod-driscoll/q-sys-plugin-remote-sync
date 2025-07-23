@@ -8,9 +8,9 @@ Platform: Q-Sys
 
 Source code location: <https://github.com/rod-driscoll/q-sys-plugin-remote-sync>
 
-![Control tab](https://github.com/rod-driscoll/q-sys-plugin-remote-sync/blob/master/content/control.png)\
+![Control tab](https://github.com/rod-driscoll/q-sys-plugin-remote-sync/blob/master/content/control.png)
 
-![Setup tab](https://github.com/rod-driscoll/q-sys-plugin-remote-sync/blob/master/content/setup.png)\
+![Setup tab](https://github.com/rod-driscoll/q-sys-plugin-remote-sync/blob/master/content/setup.png)
 
 ## Deploying code
 
@@ -35,7 +35,7 @@ The files in "./DEV/" are for dev only and may not be the most current code, the
 
 Sync components between cores.\
 This will sync components from a remote core to the local core.\
-On connection the local components will be synched with the remote components.\
+On connection the local components will be synched with the remote components.
 
 1. Place a component in a remote core and give it script access of 'External' or 'All'.
 2. Copy and paste the component into the local core and make sure the local copy of the script has script access of 'Internal' or 'All'.
@@ -46,13 +46,17 @@ On connection the local components will be synched with the remote components.\
 
 ### Items of note
 
+The original use-case of this plugin was the desire to run UCI code on a separate core to the main code, wher the local core runs the UCI and the remote core runs the main program. To achieve the requiremnt it is necessary to have a copy of any component that the UCI references on the local core.
+
 It is recommented to use the 'common components' drop down box and select components which have the same script ID on both the local and remote cores. It is possible to sync components with different script ID names by selecting the 'Local components' and 'remote component' combos.
 
 If local and remote components are not the same type then it will sync all controls with the same name if possible.
 
 Only writable controls can be synched, e.g. it won't sync the status control of devices.
 
-If the 'code' control on a script is synchronised then it causes problems with the same code running on both systems. When synchronising scripts it is best to copy the remote script into the local system and delete the script code in the local script so that only user controls events are syncronised and the code is ony running on the remote script, for this reason the 'code' control is not synchronised to the local system. Beware that if you modify the code on a local script at run time then that change will be sent to the remote script overwriting it, this is to enable deploying code to scripts remotely.
+By default the 'code' control will not be modified in either direction to prevent accidentally overwriting scripts, this can be chaged with the controls "Enable pulling code" and "Enable pushing code".
+
+If you enable the control "Clear local code" then the script will delete the 'code' in any local scripts if and when the local script is selected to be synched, this is for situations where you only want the buttons of the local script to trigger events on the remote script and have the remote script run without any logic being performed on the local system. If you accidentally clear the code in your scripts it is backed up and toggling "Clear local code" off will restore the original code to the scripts.
 
 Synchronising plugins has not been tested, if you wish to synchronise a plugin then it is best to sync a remote plugin with a script on the local system, add controls to the local script with the same names as the controls you want to synch and do not add any code to the local script.
 
@@ -63,7 +67,7 @@ Synchronising plugins has not been tested, if you wish to synchronise a plugin t
 * It currently synchs from remote to local on connect. It could be configured to synch local to remote instead or not synch at all.
 * A button to clear all components.
 * Filters for component type.
-* Controls to enable/disable synchronising script 'code'.
+* Runtime controls to enable/disable synchronising script 'code' per script.
 * Look into the best way to handle plugin synchronisation.
 
 ## Changelog

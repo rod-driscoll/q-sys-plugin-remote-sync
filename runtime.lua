@@ -5,11 +5,6 @@ rapidjson = require "rapidjson"
 -----------------------------------------------------------------------------------------------------------------------
 -- Variables
 -----------------------------------------------------------------------------------------------------------------------
-local DisablePullingScriptCode = true -- scripts will screw up if you pull the code from scripts and overwrite/run it on the local core
-local DisableSubscribingToScriptCode = true 
-local DisablePushingScriptCode = false -- TODO: make these variables run time editable
-
-
 local DebugTx=Controls.DebugTx.Boolean
 local DebugRx=Controls.DebugRx.Boolean
 local DebugFunction=Controls.DebugFunction.Boolean
@@ -99,8 +94,9 @@ local commandQueue = {}
 local queueBusy = false
 
 local messageIDs = {}
-local LocalComponents = {}
-local LocalControls = {}
+local LocalComponents = {} -- the components on the local system gathered by Component.New()
+local LocalControls = {}   -- The controls on the local system gathered by Component.GetControls(cmp)
+local LocalCodeBackup = {}       -- 'code' on local components backed up and restored when the ClearLocalCode control is toggle
 local RemoteComponents = {}
 local RemoteControls = {}
 local RemoteSubscriptions = {}
@@ -309,7 +305,6 @@ end
 
 local function UpdateCommonControls(i)
   local remote_name = Controls.RemoteComponents[i].String
-  --local max = 8880 -- Max execution error at this amount of comparisons
   print('UpdateCommonControls('..i..') "'..remote_name..'"')
   local choices = {[1]= ''}
   local lookup = {}
@@ -347,12 +342,12 @@ local function UpdateCommonControls(i)
     end
     local remote_controls = {}
     for _,v in ipairs(choices) do -- only subscribe to controls if not already subscribed
-      if v~='' and not RemoteSubscriptions[remote_name][v] then 
-        if v=='code' and DisableSubscribingToScriptCode then 
+      if v~='' and not RemoteSubscriptions[remote_name][v] then
+        if v=='code' and not Controls.EnablePullingCode.Boolean then
           if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
         else
           --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
-          table.insert(remote_controls, {["Name"]=v}) 
+          table.insert(remote_controls, {["Name"]=v})
         end
       else
         --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..v..'"] already subscribed') end
@@ -391,7 +386,7 @@ local function SyncComponent(i)
   if #Component.GetControls(local_)>0 then
     --{"FunctionMicGain_1":[{"Name":"bypass","Type":"Boolean","Value":false,"String":"no","Position":0.0,"Direction":"Read/Write"},{"Name":"gain","Type":"Float","Value":0.0,"ValueMin":-21.0,"ValueMax":0.0,"StringMin":"-21.0dB","StringMax":"0dB","String":"0dB","Position":1.0,"Direction":"Read/Write"},{"Name":"invert","Type":"Boolean","Value":false,"String":"normal","Position":0.0,"Direction":"Read/Write"},{"Name":"mute","Type":"Boolean","Value":true,"String":"muted","Position":1.0,"Direction":"Read/Write"}]}
     for _,v in ipairs(Controls.CommonControls[i].Choices) do -- assuming CommonControls is already updated
-      if v~='' and not (v=='code' and DisablePullingScriptCode) then -- ignore blank and script 'code'
+      if v~='' and not (v=='code' and not Controls.EnablePullingCode.Boolean) then -- ignore blank and script 'code'
         for _,v1 in ipairs(remoteControls_) do
           if v1.Name == v and local_[v] and (not local_[v].Direction or local_[v].Direction:match('Write')) then -- "Name":"bypass"
             if DebugFunction then print('Synching "'..v..'" ("Value":"'..tostring(v1.Value)..'")') end
@@ -620,7 +615,7 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
                 for i=1, Properties['Component Count'].Value do
                   --if DebugFunction then print('Checking RemoteComponents['..i..']') end
                   if Controls.RemoteComponents[i].String == change_.Component then
-                    if change_.Name=='code' and DisablePullingScriptCode then -- ignore script 'code'
+                    if change_.Name=='code' and not Controls.EnablePullingCode.Boolean then -- ignore script 'code'
                       if DebugFunction then print('not synching ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]') end
                     else
                       if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]: '..tostring(change_.Value)) end
@@ -728,7 +723,6 @@ local function RemoteComponentEvent(ctl, i)
     end
     SendData('Component.GetControls', {["Name"]=ctl.String})
   end
-  -- WARNING: if too many controls are defined there will be a max execution error here
   UpdateCommonControls(i)
 end
 
@@ -911,7 +905,7 @@ function InitialiseComponents()
         if DebugFunction then print('control EventHandlers for "'..local_component_name..'" are already defined') end
       else
         if DebugFunction then print('Adding control EventHandlers for "'..local_component_name..'"') end
-        LocalControls[local_component_name] = ctls 
+        LocalControls[local_component_name] = ctls
         for _,v1 in ipairs(ctls) do
           if LocalComponents[local_component_name][v1.Name]~=nil then
             --if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
@@ -920,7 +914,7 @@ function InitialiseComponents()
               if ctl.Type=='Boolean' then val = ctl.Boolean -- can't do this in a ternary because a boolean can be false
               elseif ctl.Type=='Trigger' then val = ctl.Boolean -- Triggers aren't really supported in QSC protocol
               end -- can't do this in a ternary because a boolean can be false
-              if v1.Name=='code' and DisablePushingScriptCode then 
+              if v1.Name=='code' and not Controls.EnablePushingCode.Boolean then 
                  if DebugFunction then print('not sending local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]')  end
               else
                 if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
@@ -960,6 +954,62 @@ function InitialiseComponents()
       v.Choices = choices
       v.EventHandler = function(ctl) LocalComponentEvent(ctl, i) end
     end
+
+    Controls.ClearLocalCode.EventHandler = function(ctl) --LocalCodeBackup
+      local clearedCodeScript = "print('code cleared by q-sys-plugin-remote-sync plugin - ClearLocalCode control')"
+      for i,v in ipairs(Controls.LocalComponents) do
+        if v.String~='' and LocalComponents[v.String] and LocalComponents[v.String]['code'] then
+          if ctl.Boolean then -- clear code
+            if #LocalComponents[v.String]['code'].String>0 and LocalComponents[v.String]['code'].String~=clearedCodeScript then
+              LocalCodeBackup[v.String] = LocalComponents[v.String]['code'].String -- back it up
+            end
+            LocalComponents[v.String]['code'].String = clearedCodeScript
+            if DebugFunction then print('Cleared local code for "'..v.String..'"') end
+          else -- restore code
+            if LocalComponents[v.String]['code'].String=='' or LocalComponents[v.String]['code'].String==clearedCodeScript then
+              if LocalCodeBackup[v.String] then --attempt to restore code from memory
+                if DebugFunction then print('Restoring code from backup "'..v.String..'"]\n'..LocalCodeBackup[v.String]) end
+                LocalComponents[v.String]['code'].String = LocalCodeBackup[v.String]
+              elseif Controls.EnablePullingCode.Boolean then --attempt to pull and sync code from remote
+                if DebugFunction then print('Restoring code from remote "'..v.String..'"') end
+                SendData('Component.Get', {
+                  ["Name"]=v.String, 
+                  ["Controls"]={{["Name"]='code'}}
+                })
+              end
+            end
+          end
+        break end
+      end
+    end
+
+    Controls.EnablePullingCode.EventHandler = function(ctl)
+      if ctl.Boolean then
+        if DebugFunction then print('Enabling code pulling from remote') end
+        Controls.ClearLocalCode.Boolean = false -- mutually exclusive
+        local seen = {}
+        for i,v in ipairs(Controls.RemoteComponents) do
+          if v.String~='' and not seen[v.String] then
+            seen[v.String] = true
+            for _,v1 in ipairs(Controls.CommonControls[i].Choices) do
+              if v1=='code' then
+                if DebugFunction then print('Subscribing to remote['..i..'] "'..v.String..'".code') end           
+                SendData('ChangeGroup.AddComponentControl', {
+                  ["Id"]=ChangeGroup,
+                  ["Component"]={
+                    ["Name"]=v.String,
+                    ["Controls"]={ {["Name"]='code'} }
+                  }
+                })
+              end
+            end
+          end
+        end
+      else
+        if DebugFunction then print('Disabling code pulling from remote') end
+      end
+    end
+
   end
 
 	local function GetRemoteComponents()

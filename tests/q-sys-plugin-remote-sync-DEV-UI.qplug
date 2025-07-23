@@ -91,6 +91,30 @@ function GetControls(props)
     UserPin      = true,
     Count        = 1
   })
+  table.insert(ctrls, {
+    Name         = "EnablePushingCode",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+  table.insert(ctrls, {
+    Name         = "EnablePullingCode",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
+  table.insert(ctrls, {
+    Name         = "ClearLocalCode",
+    ControlType  = "Button",
+    ButtonType   = "Toggle",
+    PinStyle     = "Input",
+    UserPin      = true,
+    Count        = 1
+  })
   
   -- Configuration Controls --
   table.insert(ctrls, {
@@ -119,7 +143,7 @@ function GetControls(props)
   })
   table.insert(ctrls, {
     Name         = "Port",
-    ControlType  = "Text",
+    ControlType  = "Knob",
     ControlUnit  = "Integer",
     DefaultValue = 1710,
     Min          = 0,
@@ -128,7 +152,7 @@ function GetControls(props)
     UserPin      = true,
     PinStyle     = "Both"
   })
-
+  
   -- Runtime control --
   table.insert(ctrls, {
     Name         = "LoadComponents",
@@ -138,7 +162,7 @@ function GetControls(props)
     UserPin      = true,
     Count        = 1
   })
-
+  
   table.insert(ctrls, {
     Name         = "StringToSend",
     ControlType  = "Text",
@@ -250,7 +274,7 @@ function GetControls(props)
     ControlType  = "Button",
     ButtonType   = "Toggle",
     PinStyle     = "Input",
-    UserPin      = true,
+    UserPin      = false,
     Count        = props['Component Count'].Value
   })
   return ctrls
@@ -301,16 +325,15 @@ function GetControlLayout(props)
   
     table.insert(graphics,{Type="Knob",Text="Port"          ,Position={ 15,95},Size={100,16},FontSize=14,HTextAlign="Right"})
     layout["Port"] = {PrettyName="Settings~Port"            ,Position={120,95},Size={100,16},Style="Text",Color=colors.White,FontSize=12}
-
+  
     table.insert(graphics,{Type="Text",Text="Connected"           ,Position={224,35},Size={100,16},FontSize=14,HTextAlign="Right"})
     layout["Connected"] = {PrettyName="Settings~Connected"        ,Position={324,35},Size={16,16},Style="Led",Color=colors.Green}
-
+  
     table.insert(graphics,{Type="Text",Text="Login required"      ,Position={224,55},Size={100,16},FontSize=14,HTextAlign="Right"})
     layout["LoginRequired"] = {PrettyName="Settings~LoginRequired",Position={324,55},Size={16,16},Style="Led",Color=colors.Blue}
-
+  
     table.insert(graphics,{Type="Text",Text="LoggedIn"            ,Position={224,75},Size={100,16},FontSize=14,HTextAlign="Right"})
     layout["LoggedIn"] = {PrettyName="Settings~LoggedIn"          ,Position={324,75},Size={16,16},Style="Led",Color=colors.Blue}
-
   
     -- Status fields updated upon connect
     table.insert(graphics,{Type="GroupBox",Text="Status",Fill=colors.Background,StrokeWidth=1,CornerRadius=4,HTextAlign="Left",Position={5,135},Size={400,85}})
@@ -318,15 +341,22 @@ function GetControlLayout(props)
     table.insert(graphics,{Type="Text",Text=GetPrettyName(),Position={15,200},Size={380,14},FontSize=10,HTextAlign="Right", Color=colors.Gray})
   
   elseif(CurrentPage == 'System') then 
-    --table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
-    --layout["LoadComponents"] = {PrettyName="Settings~LoadComponents"  ,Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
-    table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
-    layout["DebugFunction"] = {PrettyName="Settings~DebugFunction"    ,Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
-    table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
-    layout["DebugTx"] = {PrettyName="Settings~DebugTx"                ,Position={146, 37},Size={ 36, 16},FontSize=12,Style="Button"}
-    table.insert(graphics,{Type="Text",Text="Debug Rx"                ,Position={ 10, 53},Size={135, 16},FontSize=14,HTextAlign="Left"})
-    layout["DebugRx"] = {PrettyName="Settings~DebugRx"                ,Position={146, 53},Size={ 36, 16},FontSize=12,Style="Button"}
-
+    table.insert(graphics,{Type="Text",Text="Enable pulling code"           ,Position={ 10,  5},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["EnablePullingCode"] = {PrettyName="Settings~Enable pulling code",Position={146,  5},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Enable pushing code"           ,Position={ 10, 21},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["EnablePushingCode"] = {PrettyName="Settings~Enable pushing code",Position={146, 21},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Clear local code"              ,Position={ 10, 37},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["ClearLocalCode"] = {PrettyName="Settings~Clear local code"      ,Position={146, 37},Size={ 36, 16},FontSize=12,Style="Button"}
+    
+    --table.insert(graphics,{Type="Text",Text="Load components"         ,Position={ 10, 53},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    --layout["LoadComponents"] = {PrettyName="Settings~Load components" ,Position={146, 53},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Function"          ,Position={ 10, 69},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugFunction"] = {PrettyName="Settings~Debug Function"   ,Position={146, 69},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Tx"                ,Position={ 10, 85},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugTx"] = {PrettyName="Settings~Debug Tx"               ,Position={146, 85},Size={ 36, 16},FontSize=12,Style="Button"}
+    table.insert(graphics,{Type="Text",Text="Debug Rx"                ,Position={ 10,101},Size={135, 16},FontSize=14,HTextAlign="Left"})
+    layout["DebugRx"] = {PrettyName="Settings~Debug Rx"               ,Position={146,101},Size={ 36, 16},FontSize=12,Style="Button"}
+   
   elseif(CurrentPage == 'Devices') then
     local columns_ = {
       {Title="Common components", Id="CommonComponents",Position={298,  5}, Cell={Style="ComboBox"}},
@@ -335,7 +365,7 @@ function GetControlLayout(props)
       {Title="Common controls"  , Id="CommonControls"  ,Position={730,  5}, Cell={Style="ComboBox"}},
       {Title="Local controls"   , Id="LocalControls"   ,Position={442,  5}, Cell={Style="ComboBox"}},
       {Title="Remote controls"  , Id="RemoteControls"  ,Position={586,  5}, Cell={Style="ComboBox"}},
-      {Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
+      --{Title="Sync"             , Id="SyncComponent"   ,Position={747,  5}, Cell={Style="Button"}},
     }
     local w = { Number  = 36, Text = 144, ComboBox = 144, ListBox = 144, Status  = 128, Button = 51, Led = 16 }
     local h = 28
