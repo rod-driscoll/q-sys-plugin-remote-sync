@@ -244,7 +244,10 @@ local function Write(data) --data={table={},string=''}
     messageIDs[data.table.id] = tbl_
     if DebugTx then print("Tx: "..str_) end
     socket:Write(str_..'\n\r\x00')
-  elseif DebugFunction then print("DIDN'T SEND DATA - NO CONNECTION TO HOST") end
+  elseif 
+    DebugFunction and DebugTx then 
+      print("NOTICE: Didn't send "..#str_.." bytes of data - NO CONNECTION TO HOST")
+    end
 end
 
 function SendData(method, params)
@@ -463,7 +466,7 @@ local function HandleRemoteSubscriptionData(result, message)
 end
 
 local function Logon(params)--Logon{ ['User'] = Controls.Username.String, ['Password'] = Controls.Password.String }
-  --if DebugFunction then print('Logon, params: '..(params and rapidjson.encode(params) or '')) end
+  if DebugFunction then print('Logon called') end --, params: '..(params and rapidjson.encode(params) or '')) end
   local params_ = params or ''
   messageId = 1
   local data_ = {
@@ -471,17 +474,48 @@ local function Logon(params)--Logon{ ['User'] = Controls.Username.String, ['Pass
       ['id'] = messageId,
       ['method'] = 'Logon',
       ['params'] = params_
-  }  
+  }
   local tbl_ = {['table']=data_} 
   messageIDs[messageId] = tbl_ -- add message id for comparing rx
   Write(tbl_)
-end 
+end
+
+local function RemoteComponentEvent(ctl, i)
+  print('Remote component['..i..'] selected "'..ctl.String..'"')
+  if ctl.String == '' then 
+    Controls.RemoteControls[i].Choices = {}
+    Controls.CommonControls[i].Choices = {}
+  else
+    for i1=1, Properties['Component Count'].Value do
+      if i1~=i and Controls.RemoteComponents[i1].String == ctl.String and #Controls.RemoteComponents[i1].Choices>0 then
+        print(i1..': '..Controls.RemoteComponents[i1].String)
+        ctl.Choices = Controls.RemoteComponents[i].Choices -- todo: flag that we don't need to send GetControls request now
+      end
+    end
+    SendData('Component.GetControls', {["Name"]=ctl.String})
+  end
+  UpdateCommonControls(i)
+end
+
+local function GetRemoteComponents()
+  if DebugFunction then print('GetRemoteComponents()') end
+  SendData('Component.GetComponents', {})
+  local updated = {}
+  for i,v in ipairs(Controls.RemoteComponents) do 
+    if v.String~= '' and updated[v.String or 'nil']==nil then -- only update if not done so already
+      RemoteComponentEvent(v, i)
+      updated[v.String] = true
+    end 
+  end
+  ProcessSubscribersBuffer()
+end
 
 local function LoggedIn(status)
   if status and not Controls.LoggedIn.Boolean then
     if DebugFunction then print('Login success, message queue size: '..#commandQueue) end
     Controls.LoggedIn.Boolean = true 
-    queueBusy = false  
+    queueBusy = false
+    GetRemoteComponents()
     ProcessSubscribersBuffer()
   end
 end
@@ -709,23 +743,6 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
   if DebugFunction and #log>0 then print(log) end
 end
 
-local function RemoteComponentEvent(ctl, i)
-  print('Remote component['..i..'] selected "'..ctl.String..'"')
-  if ctl.String == '' then 
-    Controls.RemoteControls[i].Choices = {}
-    Controls.CommonControls[i].Choices = {}
-  else
-    for i1=1, Properties['Component Count'].Value do
-      if i1~=i and Controls.RemoteComponents[i1].String == ctl.String and #Controls.RemoteComponents[i1].Choices>0 then
-        print(i1..': '..Controls.RemoteComponents[i1].String)
-        ctl.Choices = Controls.RemoteComponents[i].Choices -- todo: flag that we don't need to send GetControls request now
-      end
-    end
-    SendData('Component.GetControls', {["Name"]=ctl.String})
-  end
-  UpdateCommonControls(i)
-end
-
 local function LoggedOut()
   Controls.Platform.String = ''
   Controls.DesignName.String = ''
@@ -735,6 +752,7 @@ local function LoggedOut()
   RemoteSubscriptions = nil -- clear
   RemoteSubscriptions = {}
   AutoPollInitiated = false
+  rxBuffer = ''
 end 
 
 local function SocketClosed()
@@ -773,20 +791,12 @@ function ReportStatus(state,msg)
 end
 
 socket.Connected = function(sock)
-  ReportStatus("OK","")
+  ReportStatus("OK","Socket connected")
   if #Controls.Username.String > 0 then
-    Controls.LoginRequired.Boolean = true 
+    Controls.LoginRequired.Boolean = true
     Logon({ ['User'] = Controls.Username.String, ['Password'] = Controls.Password.String })
   end
-  SendData('Component.GetComponents', {})
-  local updated = {}
-  for i,v in ipairs(Controls.RemoteComponents) do 
-    if v.String~= '' and updated[v.String or 'nil']==nil then -- only update if not done so already
-      RemoteComponentEvent(v, i)
-      updated[v.String] = true
-    end 
-  end
-  ProcessSubscribersBuffer()
+  if not Controls.LoginRequired.Boolean then GetRemoteComponents() end
 end
 
 socket.Reconnect = function(sock)
@@ -804,8 +814,8 @@ socket.Timeout = function(sock, err)
 end
 
 socket.Data = function()		
-  ReportStatus("OK","")
   local str = socket:Read(socket.BufferLength)
+  ReportStatus("OK", #str.." bytes of data received")
   rxBuffer = rxBuffer .. str
   if DebugRx then print((DebugFunction and 'TCP socket: '..#str..' bytes, rxBuffer: '..#rxBuffer..' bytes' or '')..(DebugRx and '. Rx <-\n'..str or '')) end
   if Controls.RxData then Controls.RxData.String = str end
@@ -866,7 +876,7 @@ end
 function InitialiseComponents()
 
   local function SendEventToRemote(component_name, control_name, value)
-
+    if DebugFunction then print('SendEventToRemote("'..component_name..'","'..control_name..'","'..tostring(value)..'"') end
     for i,v in ipairs(Controls.LocalComponents) do
       if v.String == component_name then -- send to the remote
         local remote_mame = Controls.RemoteComponents[i].String
@@ -1012,17 +1022,12 @@ function InitialiseComponents()
 
   end
 
-	local function GetRemoteComponents()
-		if DebugFunction then print('GetRemoteComponents()') end
-    SendData('Component.GetComponents', {})
+  function CreateComponentEventHandlers()
+		GetLocalComponents()
+    -- RemoteComponents EventHandlers
     for i=1, Properties['Component Count'].Value do
       Controls.RemoteComponents[i].EventHandler = function(ctl) RemoteComponentEvent(ctl, i) end
     end
-	end
-
-  function GetComponents()
-		GetLocalComponents()
-		GetRemoteComponents()
     -- Common components EventHandlers
     for i=1, Properties['Component Count'].Value do
 
@@ -1040,14 +1045,14 @@ function InitialiseComponents()
       Controls.SyncComponent[i].EventHandler = function(ctl)
         --print('SyncComponent['..i..'] event '..tostring(ctl.Boolean))
         if ctl.Boolean then SyncComponent(i) end
-      end 
+      end
 
-    end 
+    end
 	end
 
-  GetComponents()
+  CreateComponentEventHandlers()
   Controls.LoadComponents.EventHandler = GetComponents
-	
+
 end
 
 function Initialise()
