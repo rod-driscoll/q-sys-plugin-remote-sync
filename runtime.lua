@@ -100,9 +100,14 @@ local LocalCodeBackup = {}       -- 'code' on local components backed up and res
 local RemoteComponents = {}
 local RemoteControls = {}
 local RemoteSubscriptions = {}
+local RemoteComponentDefined = {}
 local ChangeGroup = tostring(math.random(255))
 local AutoPollInitiated = false
 local PollRate = 0.5 -- lower this to 0.5 when it all works
+
+ChangeTimer = Timer.New()
+ChangeTimer:Start(0.1)
+local ChangesToProcess = {}
 
 local function getTableAndRaw(data) --data={table={},string=''}
   --print('getTableAndRaw type: '..type(data))
@@ -376,20 +381,41 @@ local function UpdateCommonControls(i)
   end 
 end
 
+
 local function SyncComponent(i)
   local local_ = Component.New(Controls.LocalComponents[i].String)
   print('SyncComponent('..i..')\n local: "'..Controls.LocalComponents[i].String..'" has '..#Component.GetControls(local_)..' controls')
   local remoteName_ = Controls.RemoteComponents[i].String
-  local remoteControls_ = RemoteControls[remoteName_]
-  if remoteControls_ then
-    print(' RemoteControls["'..remoteName_..'"] has '..#remoteControls_..' controls')
+  if RemoteControls[remoteName_] then
+    print(' RemoteControls["'..remoteName_..'"] has '..#RemoteControls[remoteName_]..' controls')
   else
     print('RemoteControls["'..remoteName_..'"] not found')
   end
+  --for each component line (this func)
   if #Component.GetControls(local_)>0 then
-    --{"FunctionMicGain_1":[{"Name":"bypass","Type":"Boolean","Value":false,"String":"no","Position":0.0,"Direction":"Read/Write"},{"Name":"gain","Type":"Float","Value":0.0,"ValueMin":-21.0,"ValueMax":0.0,"StringMin":"-21.0dB","StringMax":"0dB","String":"0dB","Position":1.0,"Direction":"Read/Write"},{"Name":"invert","Type":"Boolean","Value":false,"String":"normal","Position":0.0,"Direction":"Read/Write"},{"Name":"mute","Type":"Boolean","Value":true,"String":"muted","Position":1.0,"Direction":"Read/Write"}]}
+    -- populate remoteControls_ 
+    --for i,v in pairs(RemoteControls[remoteName_]) do remoteControls_[i]=v end --local remoteControls_ = RemoteControls[remoteName_] 
+    --{"FunctionMicGain_1":[{"Name":"bypass","Type":"Boolean","Value":false,"String":"no","Position":0.0,"Direction":"Read/Write"},{"Name":"gain","Type":"Float","Value":0.0,"ValueMin":-21.0,"ValueMax":0.0,"StringMin":"-21.0dB","StringMax":"0dB","String":"0dB","Position":1.0,"Direction":"Read/Write"},{"Name":"invert","Type":"Boolean","Value":false,"String":"normal","Position":0.0,"Direction":"Read/Write"},{"Name":"mute","Type":"Boolean","Value":true,"String":"muted","Position":1.0,"Direction":"Read/Write"}]}        
+    
     for _,v in ipairs(Controls.CommonControls[i].Choices) do -- assuming CommonControls is already updated
-      if v~='' and not (v=='code' and not Controls.EnablePullingCode.Boolean) then -- ignore blank and script 'code'
+      if v~='' and
+        RemoteControls[remoteName_][v] and
+        not (v=='code' and not Controls.EnablePullingCode.Boolean) and
+        local_[v] and
+        (not local_[v].Direction or local_[v].Direction:match('Write')) -- "Name":"bypass"
+      then -- ignore blank and script 'code'
+        
+        if DebugFunction then print('Synching "'..v..'" ("Value":"'..tostring(RemoteControls[remoteName_][v].Value)..'")') end
+        for i2,v2 in pairs(RemoteControls[remoteName_][v]) do -- i2="Name", v2="bypass"
+          local success, err = pcall(function() 
+            if i2~='Name' and i2~='Direction' and local_[v][i2] then --["FunctionMicGain_1"]["bypass"]["Value"] = false
+              --if DebugFunction then print('  Synching  "'..i2..'": "'..tostring(v2)..'"') end
+              local_[v][i2] = RemoteControls[remoteName_][v] 
+            end
+          end)
+        end   
+      end           
+      --[[ -- to be deleted after the replacement code above is tested successfully
         for _,v1 in ipairs(remoteControls_) do
           if v1.Name == v and local_[v] and (not local_[v].Direction or local_[v].Direction:match('Write')) then -- "Name":"bypass"
             if DebugFunction then print('Synching "'..v..'" ("Value":"'..tostring(v1.Value)..'")') end
@@ -404,6 +430,7 @@ local function SyncComponent(i)
           end
         end
       end
+      ]]--
     end
   end
 end
@@ -442,7 +469,8 @@ local function HandleRemoteControlsData(data) --{"Name":"FunctionMicGain_1","Con
 end
 
 function HandleRemoteComponentsData(data) -- [{"Name": "APM ABC", "Type": "apm", "Properties":[{"Name": "multi_channel_type","Value": "1"},]},]
-	if DebugFunction then print('HandleRemoteComponentsData, found '..(data==nil and 'no data' or #data..' RemoteComponents')) end
+  if type(data)=='boolean' then print('HandleRemoteComponentsData is boolean') return end
+  if DebugFunction then print('HandleRemoteComponentsData, found '..(data==nil and 'no data' or #data..' RemoteComponents')) end
   if data~=nil then
     RemoteComponents = data
     local choices = { [1]='' }
@@ -459,7 +487,7 @@ local function HandleRemoteSubscriptionData(result, message)
   if not RemoteSubscriptions[comp_.Name] then RemoteSubscriptions[comp_.Name] = {} end
   for i,v in pairs(comp_.Controls) do
     if not RemoteSubscriptions[comp_.Name][v.Name] then
-      if DebugFunction then print('Remote subscription to "'..comp_.Name..'"["'..v.Name..'"] '..(result and 'Success' or 'Failed')) end
+      --if DebugFunction then print('Remote subscription to "'..comp_.Name..'"["'..v.Name..'"] '..(result and 'Success' or 'Failed')) end
       RemoteSubscriptions[comp_.Name][v.Name] = result
     end
   end
@@ -485,7 +513,9 @@ local function RemoteComponentEvent(ctl, i)
   if ctl.String == '' then 
     Controls.RemoteControls[i].Choices = {}
     Controls.CommonControls[i].Choices = {}
+    if RemoteComponentDefined[i] then table.remove(RemoteComponentDefined, i) end
   else
+    RemoteComponentDefined[i] = true
     for i1=1, Properties['Component Count'].Value do
       if i1~=i and Controls.RemoteComponents[i1].String == ctl.String and #Controls.RemoteComponents[i1].Choices>0 then
         print(i1..': '..Controls.RemoteComponents[i1].String)
@@ -520,6 +550,80 @@ local function LoggedIn(status)
   end
 end
 
+local function UpdateChange(change) -- change = { "Component": "BGM XFADE", "Name": "InputSelect 1", "String": "BGM GLOBAL 1", .. }
+  --for i=1, Properties['Component Count'].Value do
+  for i,_ in pairs(RemoteComponentDefined) do
+    --if DebugFunction then print('Checking RemoteComponents['..i..']') end
+    if Controls.RemoteComponents[i].String == change.Component then
+      if change.Name=='code' and not Controls.EnablePullingCode.Boolean then -- ignore script 'code'
+        if DebugFunction then print('not synching ChangeGroup for RemoteComponents['..i..']["'..change.Component..'"]["'..change.Name..'"]') end
+      else
+        if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change.Component..'"]["'..change.Name..'"]: '..tostring(change.Value)) end
+        local local_ = LocalComponents[Controls.LocalComponents[i].String]
+        if local_ and local_[change.Name] then
+          --if DebugFunction then print('LocalComponents["'..Controls.LocalComponents[i].String..'"]["'..change.Name..'"] exists') end
+          for k1, v1 in pairs(change) do
+            local success, msg = pcall(function() 
+              if k1~='Component' and k1~='Name' and k1~='Direction' and (not local_[change.Name].Direction or local_[change.Name].Direction:match('Write')) and local_[change.Name][k1] then
+                --if DebugFunction then print('Updating LocalComponents["'..change.Component..'"]["'..change.Name..'"]["'..k1..'"]: '..tostring(v1)) end
+                local_[change.Name][k1] = v1
+              end
+            end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
+            --if not success and DebugFunction then print('local "'..change.Name..'"["'..k1..'"] error\n'..msg) end
+          end
+        end
+      end
+    end
+  end
+  if ChangesToProcess[change.Component] and ChangesToProcess[change.Component][change.Name]~=nil then
+    ChangesToProcess[change.Component][change.Name]=nil
+  end
+end
+
+function ProcessNextChange()
+  if ChangesToProcess and #ChangesToProcess>0 then
+    for componentName, component in pairs(ChangesToProcess) do 
+      if component and #component>0 then
+        for controlName, control in pairs(component) do  
+          if ChangesToProcess[change.Component]~=nil and ChangesToProcess[change.Component][change.Name]~=nil then
+            if DebugFunction then print('Updating and Removing '..change.Component..'['..change.Name..'] from ChangesToProcess') end
+          end
+          UpdateChange(control)
+          return
+        end
+      end
+    end
+  end
+end
+
+ChangeTimer.EventHandler = ProcessNextChange
+
+local function HandleChangeGroupPollData(data)
+  -- ChangeGroup.Poll doesn't include a data.id so need to figure out what subscriber scripts to send it to
+  --{"jsonrpc":"2.0","method":"ChangeGroup.Poll","params":{"Id":"1","Changes":[]}}
+  local log = ''
+  if #data.params.Changes > 0 then 
+    if DebugFunction then  log = log..'HandleChangeGroupPollData\n method: '..data.method..', '..#data.params.Changes..' changes'end -- only log changes
+    local localUpdates_ = {} -- create custom responses for each subscriber script
+    local cur_ = ''
+    local success, err = pcall(function()
+      for _, change_ in ipairs(data.params.Changes) do 
+        cur_ = change_
+        if not ChangesToProcess[change_.Component] then ChangesToProcess[change_.Component] = {} end
+        ChangesToProcess[change_.Component][change_.Name] = change_ -- load data to be processed on a timer in case of max execution error
+        UpdateChange(change_)
+      end
+    end) --this causes a Max execution error with large components
+    if not success then 
+      print(log..'\nERROR at UppdateChange ["'..cur_.Component..'"]["'..cur_.Name..'"]\n'..err)
+      log = ''
+      print('Timer will complete synchronisation with UppdateChange')
+    end
+  end
+  if DebugFunction and log~='' then print(log) end
+end
+
+
 function ParseResponse(data, raw) -- TODO: break this up onto smaller functions, best to create a table of method fiunctions to handle
   --{"jsonrpc":"2.0","id":"Script killer-186","error":{"code":10,"message":"Logon required"}}
   --{"jsonrpc":"2.0","method":"EngineStatus","params":{"Platform":"Core 110f","State":"Active","DesignName":"Gosford RSL CORE110F DEV V1.5.0 20250114","DesignCode":"srOW2FUZF3HC","IsRedundant":false,"IsEmulator":false,"Status":{"Code":4,"String":"Missing - 1 OK, 4 Compromised, 76 Missing"}}}
@@ -543,10 +647,8 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
           if data.error then
             if DebugFunction then log = log..'\n error code: "'..data.error.code..'", message: '..data.error.message end
             if data.error.code == 10 then --"error":{"code":10,"message":"Logon required"}
-              Controls.LoginRequired.Boolean = true 
-              Controls.LoggedIn.Boolean = false 
-              print('LoginRequired, logging in')
-              Logon({ User = Controls.Username.String, Password = Controls.Password.String })
+              Controls.LoginRequired.Boolean = true
+              LoggedOut()
             end
           else
             local component_ = Component.New(componentId_)
@@ -597,90 +699,9 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
               if Controls[k] and type(v) == 'string' then Controls[k].String = v end
             end
 
-          elseif data.method == 'ChangeGroup.Poll' then 
-            -- ChangeGroup.Poll doesn't include a data.id so need to figure out what subscriber scripts to send it to
-            if DebugFunction then -- only log changes
-              log = #data.params.Changes==0 and '' or log..'\n method: '..data.method..', '..#data.params.Changes..' changes'
-            end
-            --{"jsonrpc":"2.0","method":"ChangeGroup.Poll","params":{"Id":"1","Changes":[]}}
-            if #data.params.Changes > 0 then 
-              local localUpdates_ = {} -- create custom responses for each subscriber script
-              for _, change_ in ipairs(data.params.Changes) do
-                -- change_ = { "Component": "BGM XFADE", "Name": "InputSelect 1", "String": "BGM GLOBAL 1", .. }
-                -- subscriber scripts on this core
-                for localScript_, subscribers_ in pairs(subscriber) do 
-                  --print('  localScript_['..localScript_..']')
-                  -- subscriber[componentId][subscribers]         
-                  --[[ {"jsonrpc":"2.0","method":"ChangeGroup.Poll","params":{"Id":"1","Changes":[
-                          {"Component":"Zone1Gain","Name":"mute","String":"muted","Value":1.0,"Position":1.0},
-                          {"Component":"Zone1Gain","Name":"gain","String":"-15.6dB","Value":-15.55555343,"Position":0.6888889},
-                          {"Component":"Zone2Gain","Name":"mute","String":"muted","Value":1.0,"Position":1.0},
-                          {"Component":"Zone2Gain","Name":"gain","String":"0dB","Value":0.0,"Position":1.0}
-                        ]}}
-                  ]]--
-                  for i, subscriber_ in pairs(subscribers_) do 
-                    --print('   ['..localScript_..']['..i..']') -- localScript_ = 'BGM level controls' i = 'Zone1Gain'
-                    -- localScript_ == 'BGM zone source assign'
-                    -- subscriber_.params.Component.Name = 'BGM XFADE'
-                    -- subscriber_.params.Component.Controls[1].Name = 'InputSelect 1'
-                    if change_.Component == subscriber_.params.Component.Name then --e.g. 'BGM XFADE', 'lighting'
-                      --if DebugFunction then log = log..'\n  Matched local component ['..change_.Component..'], remote control ['..change_.Name..']' end
-                      for _, v in ipairs(subscriber_.params.Component.Controls) do -- change_.Name = 'mute', 'preset.3 1'
-                        --if DebugFunction then log = log..'\n   subscriber control: v.Name ['..v.Name..']' end
-                        if change_.Name == v.Name then -- 'InputSelect 1' or 'mute'
-                          --if DebugFunction then log = log..'\n  Matched local: ['..localScript_..'], remote: ['..change_.Component..']['..v.Name..']' end
-                          if not localUpdates_[localScript_] then
-                            localUpdates_[localScript_] = {
-                              ['jsonrpc'] = data.jsonrpc,
-                              ['method'] = data.method,
-                              ['params'] = { 
-                                ['Id'] = id, 
-                                ['Changes'] = {}
-                              }
-                            }
-                          end
-                          table.insert(localUpdates_[localScript_].params.Changes, change_)
-                        end
-                      end
-                    end
-                  end
-                end 
-                -- subscribers in this plugin
-                for i=1, Properties['Component Count'].Value do
-                  --if DebugFunction then print('Checking RemoteComponents['..i..']') end
-                  if Controls.RemoteComponents[i].String == change_.Component then
-                    if change_.Name=='code' and not Controls.EnablePullingCode.Boolean then -- ignore script 'code'
-                      if DebugFunction then print('not synching ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]') end
-                    else
-                      if DebugFunction then print('ChangeGroup for RemoteComponents['..i..']["'..change_.Component..'"]["'..change_.Name..'"]: '..tostring(change_.Value)) end
-                      local local_ = LocalComponents[Controls.LocalComponents[i].String]
-                      if local_ and local_[change_.Name] then
-                        if DebugFunction then print('LocalComponents["'..Controls.LocalComponents[i].String..'"]["'..change_.Name..'"] exists') end
-                        for k1, v1 in pairs(change_) do
-                          local success, msg = pcall(function() 
-                            if k1~='Component' and k1~='Name' and k1~='Direction' and (not local_[change_.Name].Direction or local_[change_.Name].Direction:match('Write')) and local_[change_.Name][k1] then
-                              --if DebugFunction then print('Updating LocalComponents["'..change_.Component..'"]["'..change_.Name..'"]["'..k1..'"]: '..tostring(v1)) end
-                              local_[change_.Name][k1] = v1
-                            end
-                          end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-                          --if not success and DebugFunction then print('local "'..change_.Name..'"["'..k1..'"] error\n'..msg) end
-                        end
-                      end
-                    end
-                  end
-                end
-              end
-              for componentId_, data_ in pairs(localUpdates_) do
-                if DebugFunction then log = log..'\ncomponent id: '..componentId_ end
-                local component_ = Component.New(componentId_)
-                if component_ and #Component.GetControls(component_)>0 then 
-                  local str_ = rapidjson.encode(data_)
-                  if DebugFunction then log = log..'\nsending '..#str_..' bytes to: '..componentId_..'.StringFromRemoteQSYS' end
-                  if DebugSubscriberTx then log = log..'\ndata: '..str_ end
-                  component_.StringFromRemoteQSYS.String = str_
-                end
-              end 
-            end
+          elseif data.method == 'ChangeGroup.Poll' then
+            if DebugFunction and log~='' then print(log) log = '' end
+            HandleChangeGroupPollData(data)
           else           
             if DebugFunction then log = log..'\n method: '..data.method end
           end
@@ -740,20 +761,23 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
     if DebugFunction then log = log..'\ninvalid json in buffer, waiting for more data' end
   end
 
-  if DebugFunction and #log>0 then print(log) end
+  if DebugFunction and log~='' then print(log) end
 end
 
 local function LoggedOut()
+  if DebugFunction then print('LoggedOut') end
   Controls.Platform.String = ''
   Controls.DesignName.String = ''
-  Controls.LoggedIn.Boolean = false 
+  Controls.LoggedIn.Boolean = false
   commandQueue = nil -- clear queue
   commandQueue = {}
   RemoteSubscriptions = nil -- clear
   RemoteSubscriptions = {}
   AutoPollInitiated = false
   rxBuffer = ''
-end 
+  rxLock = false
+  Logon({ User = Controls.Username.String, Password = Controls.Password.String })
+end
 
 local function SocketClosed()
   ReportStatus("MISSING","Socket closed")
@@ -773,15 +797,15 @@ function Connect()
   end
   if DebugFunction then print('Connect('..Controls.IPAddress.String..':'..Controls.Port.String..') IsConnected: '..tostring(socket.IsConnected)) end
   if socket.IsConnected then
-    LoggedOut()
     socket:Disconnect()
+    LoggedOut()
   end
   socket:Connect(Controls.IPAddress.String, Controls.Port.Value)
 end 
 
 function ReportStatus(state,msg)
   if Controls.Status.Value ~= StatusState[state] then
-	  if DebugFunction then print("ReportStatus("..state..") "..msg) end
+	  if DebugFunction and stat~='OK' then print("ReportStatus("..state..") "..msg) end
 	end
   local msg=msg or ""
 	Controls.Status.Value = StatusState[state]
@@ -817,12 +841,12 @@ socket.Data = function()
   local str = socket:Read(socket.BufferLength)
   ReportStatus("OK", #str.." bytes of data received")
   rxBuffer = rxBuffer .. str
-  if DebugRx then print((DebugFunction and 'TCP socket: '..#str..' bytes, rxBuffer: '..#rxBuffer..' bytes' or '')..(DebugRx and '. Rx <-\n'..str or '')) end
+  if DebugRx then print((DebugFunction and 'TCP socket: '..#str..' bytes, rxBuffer: '..#rxBuffer..' bytes'..', rxLock: '..tostring(rxLock) or '')..(DebugRx and '. Rx <-\n'..str or '')) end
   if Controls.RxData then Controls.RxData.String = str end
-  if not rxLock then 
+  if not rxLock then
     rxLock = true
     while #rxBuffer>0 do
-      --if DebugFunction then print('GetRxBufferBlock, rxBuffer: '..#rxBuffer..' bytes') end
+      if DebugFunction and DebugRx then print('GetRxBufferBlock, rxBuffer: '..#rxBuffer..' bytes') end
       local tbl, raw, err = GetRxBufferBlock()
       if not tbl then 
         if DebugFunction then 
@@ -831,8 +855,8 @@ socket.Data = function()
         end
         break
       end
-      if DebugFunction then 
-        --print('GetRxBufferBlock done, #rxBuffer: '..#rxBuffer..' bytes, raw: '..(raw and #raw or 0)..' bytes')
+      if DebugFunction and DebugRx then 
+        print('GetRxBufferBlock done, #rxBuffer: '..#rxBuffer..' bytes, raw: '..(raw and #raw or 0)..' bytes')
         --print('rxBuffer raw:\n'..raw)
       end
       ParseResponse(tbl, raw)
@@ -876,14 +900,14 @@ end
 function InitialiseComponents()
 
   local function SendEventToRemote(component_name, control_name, value)
-    if DebugFunction then print('SendEventToRemote("'..component_name..'","'..control_name..'","'..tostring(value)..'"') end
+    if DebugFunction then print('SendEventToRemote("'..component_name..'","'..control_name..'","'..tostring(value)..'")') end
     for i,v in ipairs(Controls.LocalComponents) do
       if v.String == component_name then -- send to the remote
         local remote_mame = Controls.RemoteComponents[i].String
         if RemoteControls[remote_mame] then
           for i1,j1 in pairs(RemoteControls[remote_mame]) do
             if j1.Name==control_name then
-              print('Sending to remote['..i..']['..remote_mame..']: '..tostring(value))
+              if DebugFunction then print('Sending to remote['..i..']['..remote_mame..']: '..tostring(value)) end
               SendData('Component.Set', {
                   ["Name"]=remote_mame, 
                   ["Controls"]={{
@@ -939,7 +963,9 @@ function InitialiseComponents()
       end
       Controls.LocalControls[i].Choices = choices_
       UpdateCommonControls(i)
-      SendData('Component.GetControls', {["Name"]=Controls.RemoteComponents[i].String}) -- refresh remote data to sync with
+      if Controls.RemoteComponents[i].String~='' then
+        SendData('Component.GetControls', {["Name"]=Controls.RemoteComponents[i].String}) -- refresh remote data to sync with
+      end
     end
   end
 
