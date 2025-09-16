@@ -9,7 +9,7 @@ local DebugTx=Controls.DebugTx.Boolean
 local DebugRx=Controls.DebugRx.Boolean
 local DebugFunction=Controls.DebugFunction.Boolean
 local DebugPrint = Properties["Debug Print"].Value
-local DebugPattern = '^Selector 0' --'%.*'--'invert' --'^Enable 0' -- sometimes i want to pick a single control type to debug and not see the rest
+local DebugPattern = '^Enable' --'^Selector 0' --'%.*'--'invert' -- sometimes i want to pick a single control type to debug and not see the rest
 -----------------------------------------------------------------------------------------------------------------------
 -- Helper functions
 -------------------------------------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ local messageId = 1
 
 socket = TcpSocket.New()
 BufferTimer = Timer.New()
-local BufferTime = 0.01 -- 0.001 adjust to how fast the system can handle data
+local BufferTime = 0.001 -- 0.001 adjust to how fast the system can handle data
 local rxBuffer = ''
 local rxLock = false
 
@@ -107,7 +107,7 @@ local txBuffer = ''
 local txLock = false
 
 SyncComponentTimer = Timer.New()
-local SyncComponentTime = 0.1 -- 0.01 adjust to how fast the system can handle processing
+local SyncComponentTime = 0.01 -- 0.01 adjust to how fast the system can handle processing
 local SyncComponentQueue = {}
 local SyncComponentLock = false
 
@@ -631,12 +631,12 @@ end
       
 local function HandleRemoteChangeGroupData(data)
   -- ChangeGroup.Poll doesn't include a data.id so need to figure out what subscriber scripts to send it to
-  if DebugFunction then -- only log changes
-    print('HandleRemoteChangeGroupData()\n method: '..data.method..', '..#data.params.Changes..' changes')
+  if DebugFunction then 
+    --print('HandleRemoteChangeGroupData()\n method: '..data.method..', '..#data.params.Changes..' changes')
   end
   --{"jsonrpc":"2.0","method":"ChangeGroup.Poll","params":{"Id":"1","Changes":[]}}
   if #data.params.Changes > 0 then 
-    if DebugFunction then print('populating unique RemoteControls') end
+    if DebugFunction then print('HandleRemoteChangeGroupData() populating unique RemoteControls\n method: '..data.method..', '..#data.params.Changes..' changes') end
     for _, change_ in ipairs(data.params.Changes) do
       -- change_ = { "Component": "BGM XFADE", "Name": "InputSelect 1", "String": "BGM GLOBAL 1", .. }
       if DebugFunction then
