@@ -99,7 +99,7 @@ local messageId = 1
 
 socket = TcpSocket.New()
 BufferTimer = Timer.New()
-local BufferTime = 0.001 -- adjust to how fast the system can handle data
+local BufferTime = 0.01 -- 0.001 adjust to how fast the system can handle data
 local rxBuffer = ''
 local rxLock = false
 
@@ -107,7 +107,7 @@ local txBuffer = ''
 local txLock = false
 
 SyncComponentTimer = Timer.New()
-local SyncComponentTime = 0.01 -- adjust to how fast the system can handle processing
+local SyncComponentTime = 0.1 -- 0.01 adjust to how fast the system can handle processing
 local SyncComponentQueue = {}
 local SyncComponentLock = false
 
@@ -343,6 +343,7 @@ local function isInvalid(val, invalid_values)
 end 
 
 local function UpdateCommonControls(i)
+  print('UpdateCommonControls('..(i or '')..')')
   local remote_name = Controls.RemoteComponents[i].String
   --local max = 8880 -- Max execution error at this amount of comparisons
   print('UpdateCommonControls('..i..') "'..remote_name..'", local controls: '..#Controls.LocalControls[i].Choices)
@@ -365,14 +366,14 @@ local function UpdateCommonControls(i)
 
   if #remote_name>0 then
     if not RemoteSubscriptions[remote_name] then 
-      if DebugFunction then print('Creating RemoteSubscriptions["'..remote_name..'"]') end
+      if DebugFunction then print('Creating RemoteSubscriptions["'..remote_name..']') end
       RemoteSubscriptions[remote_name] = {} 
     else
       if DebugFunction then 
         if #RemoteSubscriptions[remote_name]==0 then
         local count=0
           for i1,v1 in pairs(RemoteSubscriptions[remote_name]) do
-            --print('RemoteSubscriptions["'..remote_name..'"]['..i1..']: '..tostring(v1))
+            print('RemoteSubscriptions["'..remote_name..'"]['..i1..']: '..tostring(v1))
             count=count+1
           end
           print('RemoteSubscriptions["'..remote_name..'"] has existing '..count..' controls')
@@ -417,40 +418,33 @@ local function UpdateCommonControls(i)
 end
 
 local function SyncControl(component_name, control_name) 
-  -- this only syncs components with the same name
-  -- todo: iterate through common controls for each selector and update only those items
-  if control_name:match(DebugPattern) then
-    print('SyncControl('..component_name..', '..control_name..')')      
-  end
-  local local_ = Component.New(component_name)
   if control_name then
-    if local_[control_name] then
-      if (control_name=='code' and not Controls.EnablePullingCode.Boolean) then 
-        --print('Not synching control: "code"')
-      elseif (local_[control_name].Direction and not local_[control_name].Direction:match('Read')) then -- "Name":"bypass"
-        --print('Not synching "'..local_[control_name].Direction..'" control: "'..control_name..'"')
-      elseif isInvalid(control_name, sysControlNames) then
-        --print('Not Synching a system control: "'..control_name..'"')
-      else
-        --print('Synching a local matching control: ['..component_name..']['..control_name..'] type: '..type(RemoteControls[component_name][control_name]))      
-        for k,v in pairs(RemoteControls[component_name][control_name]) do 
-          local success, msg = pcall(function() 
-            --print('~~~ '..' synching ['..localName_..']['..control_name..']['..k..']: '..v)
-            if local_[control_name][k] and not isInvalid(k, sysControlProps) then
-              if DebugFunction then 
-                --print('Updating LocalComponents["'..component_name..'"]["'..control_name..'"]["'..k..'"]: '..(type(v)=='table' and table.concat(v,",") or tostring(v))) 
-                if control_name:match(DebugPattern) and k=='Choices' then
-                  --print(string.rep('*',35)..' synching:\n    ['..component_name..']['..control_name..']['..k..']: '..(type(v)=='table' and ('\n    ['..table.concat(v,",")) or ('['..tostring(v)))..']')
-                end
-              end
-              local_[control_name][k] = v
-            end
-          end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-          --if not success and DebugFunction then print('local "'..control_name..'"["'..k..'"] error\n'..msg) end
-        end
-      end
+    if control_name:match(DebugPattern) then print('SyncControl('..component_name..', '..control_name..')') end
+    if (control_name=='code' and not Controls.EnablePullingCode.Boolean) then 
+      --print('Not synching control: "code"')
+    elseif isInvalid(control_name, sysControlNames) then
+      --print('Not Synching a system control: "'..control_name..'"')
     else
-      if DebugFunction then print('No local control:  '..control_name) end
+      for _,j in pairs(RemoteSelectors[component_name]) do
+        local local_ = Component.New(Controls.LocalComponents[j].String)
+        for k,v in pairs(RemoteControls[component_name][control_name]) do 
+          if not isInvalid(k, sysControlProps) then 
+            local success, msg = pcall(function() 
+              --print('~~~ '..' synching ['..localName_..']['..control_name..']['..k..']: '..v)
+              if local_[control_name][k] then
+                if DebugFunction then 
+                  --print('Updating LocalComponents["'..component_name..'"]["'..control_name..'"]["'..k..'"]: '..(type(v)=='table' and table.concat(v,",") or tostring(v))) 
+                  if control_name:match(DebugPattern) and k=='Choices' then
+                    --print(string.rep('*',35)..' synching:\n    ['..component_name..']['..control_name..']['..k..']: '..(type(v)=='table' and ('\n    ['..table.concat(v,",")) or ('['..tostring(v)))..']')
+                  end
+                end
+                local_[control_name][k] = v
+              end
+            end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
+            --if not success and DebugFunction then print('local "'..control_name..'"["'..k..'"] error\n'..msg) end
+          end 
+        end
+      end 
     end
   end
 end
@@ -495,9 +489,9 @@ local function SyncComponents()
     end 
   end
  
-  if DebugFunction then print('SyncComponentTimer is '..(SyncComponentTimer:IsRunning() and '' or 'not ')..'running') end
+  --if DebugFunction then print('SyncComponentTimer is '..(SyncComponentTimer:IsRunning() and '' or 'not ')..'running') end
   if not SyncComponentTimer:IsRunning() then
-    if DebugFunction then print('Starting SyncComponentTimer') end
+    --if DebugFunction then print('Starting SyncComponentTimer') end
     SyncComponentTimer.EventHandler = SyncNexItem
     SyncComponentTimer:Start(SyncComponentTime)
   end 
@@ -523,20 +517,21 @@ local function HandleRemoteControlsData(data) --{"Name":"FunctionMicGain_1","Con
   else
     if DebugFunction then print('HandleRemoteControlsData["'..data.Name.. '"] has '..#data.Controls..' controls') end
     local choices = { [1]= '' }
-    if not RemoteControls[data.Name] then 
-     if DebugFunction then print("Creating RemoteControls["..data.Name) end
-     RemoteControls[data.Name] = {} 
-    end
-    for _,j in ipairs(data.Controls) do
+    if not RemoteControls[data.Name] then RemoteControls[data.Name] = {} end
+    if not SyncComponentQueue[data.Name] then SyncComponentQueue[data.Name] = {} end
+
+    if DebugFunction then print('iterating through '..#data.Controls.. ' data.Controls') end
+    for i,j in ipairs(data.Controls) do
       RemoteControls[data.Name][j.Name] = j -- replace indexes with names. e.g. RemoteControls['Mic1']['gain'] = {"Name":"bypass","Value":false}
-      RemoteControls[data.Name][j.Name] = j -- replace indexes with names. e.g. RemoteControls['Mic1']['gain'] = {"Name":"bypass","Value":false}
+      SyncComponentQueue[data.Name][j.Name] = j -- add to queu for updating 
       table.insert(choices, j.Name) 
       if DebugFunction then
         --print(string.rep('*',35)..'\nPopulating RemoteControls["'..data.Name..'"]['..j.Name..']: '..tostring(j.Value)) 
       end
     end
     
-    if RemoteSelectors[data.Name] then --RemoteSelectors[data.Name]=={ 1,2 } meaning Controls.RemoteComponents[1]==data.Name and RemoteComponents[2]==data.Name
+    if DebugFunction then print('iterating through '..#RemoteSelectors[data.Name].. ' RemoteSelectors[data.Name]') end 
+    if RemoteSelectors[data.Name] and #RemoteSelectors[data.Name]>0 then --RemoteSelectors[data.Name]=={ 1,2 } meaning Controls.RemoteComponents[1]==data.Name and RemoteComponents[2]==data.Name
       for i,j in ipairs(RemoteSelectors[data.Name]) do
         if Controls.RemoteComponents[j].String == data.Name then -- this line shouldn't be necessary
           if DebugFunction then print('Populating Controls.RemoteComponents['..j..'].Choices with RemoteControls["'..data.Name..'"]') end
@@ -826,7 +821,10 @@ end
 
 local function RemoteComponentSelectEvent(i)
   local ctl = Controls.RemoteComponents[i]
-  if DebugFunction then print('RemoteComponentSelectEvent('..i..') "'..Controls.RemoteComponents[i].String..'"') end
+  if DebugFunction then
+    print('RemoteComponentSelectEvent('..i..')')
+    print('Controls.RemoteComponents['..i..'].String: '..Controls.RemoteComponents[i].String)
+  end
   -- clear lookup table
   if not RemoteSelectors[ctl.String] then RemoteSelectors[ctl.String] = {} end
   for _,v in pairs(RemoteSelectors) do -- e.g. i==1 and RemoteSelectors['Mic1'] = { 1,2 }
@@ -1014,30 +1012,28 @@ function InitialiseComponents()
       if v.String == component_name then -- send to the remote
         local remote_mame = Controls.RemoteComponents[i].String
         if DebugFunction then print('Matching remote['..i..']['..remote_mame..']') end
-        if RemoteControls[remote_mame] then
-          if DebugFunction then print('Sending to remote['..i..']['..remote_mame..']: '..tostring(value)) end
-          EnqueueData('Component.Set', {
-            ["Name"]=remote_mame, 
-            ["Controls"]={{
-              ["Name"]=control_name, 
-              ["Value"]=value
-            }}
-          } )
-          if RemoteControls[remote_mame][control_name] then
-            if DebugFunction then print('RemoteControls['..remote_mame..']['..control_name..'] exists') end
-          else  
-            local count = 0  
-            for i1,j1 in pairs(RemoteControls[remote_mame]) do
-              count = i1 
-              print('RemoteControls['..remote_mame..']['..tostring(j1)..'] found')
-            end
-            if count == 0 then 
-              if DebugFunction then 
-                print('RemoteControls['..remote_mame..'] has no controls stored')
-              end
+        if DebugFunction then print('Sending to remote['..i..']['..remote_mame..']: '..tostring(value)) end
+        EnqueueData('Component.Set', {
+          ["Name"]=remote_mame, 
+          ["Controls"]={{
+            ["Name"]=control_name, 
+            ["Value"]=value
+          }}
+        } )
+        if RemoteControls[remote_mame] and RemoteControls[remote_mame][control_name] then
+          if DebugFunction then print('RemoteControls['..remote_mame..']['..control_name..'] exists') end
+        else  
+          local count = 0  
+          for i1,j1 in pairs(RemoteControls[remote_mame]) do
+            count = i1 
+            print('RemoteControls['..remote_mame..']['..tostring(j1)..'] found')
+          end
+          if count == 0 then 
+            if DebugFunction then 
+              print('RemoteControls['..remote_mame..'] has no controls stored')
             end
           end
-        end       
+        end   
       end
     end
   end 
@@ -1151,7 +1147,7 @@ function InitialiseComponents()
 		if DebugFunction then print('GetRemoteComponents()') end
     EnqueueData('Component.GetComponents', {})
     for i=1, Properties['Component Count'].Value do
-      Controls.RemoteComponents[i].EventHandler = function(ctl) RemoteComponentSelectEvent(ctl, i) end
+      Controls.RemoteComponents[i].EventHandler = function(ctl) RemoteComponentSelectEvent(i) end
     end
 	end
 
