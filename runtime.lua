@@ -9,7 +9,7 @@ local DebugTx=Controls.DebugTx.Boolean
 local DebugRx=Controls.DebugRx.Boolean
 local DebugFunction=Controls.DebugFunction.Boolean
 local DebugPrint = Properties["Debug Print"].Value
-local DebugPattern = '^Enable' --'^Selector 0' --'%.*'--'invert' -- sometimes i want to pick a single control type to debug and not see the rest
+local DebugPattern = '^Selector' --'^Enable 0' --'%.*'--'invert' -- sometimes i want to pick a single control type to debug and not see the rest
 -----------------------------------------------------------------------------------------------------------------------
 -- Helper functions
 -------------------------------------------------------------------------------------------------------------------
@@ -107,7 +107,7 @@ local txBuffer = ''
 local txLock = false
 
 SyncComponentTimer = Timer.New()
-local SyncComponentTime = 0.01 -- 0.01 adjust to how fast the system can handle processing
+local SyncComponentTime = 0.005 -- 0.01 adjust to how fast the system can handle processing
 local SyncComponentQueue = {}
 local SyncComponentLock = false
 
@@ -334,7 +334,7 @@ function array_intersection(table1, table2) -- returns the intersection of two a
   return result
 end
 
-local sysControlNames = { 'log.%w', 'script.%w', 'halt.%w', 'magic.number', 'reload' }  
+local sysControlNames = { '^log.%w', '^script.%w', '^halt.%w', '^magic.number', '^reload' } -- beware: if you add a $ to the end of one of these values then the compiler will convert it to "end" and break the *.qplug
 local sysControlProps = { 'Name', 'Component', 'Direction', 'Type' }  
 local function isInvalid(val, invalid_values)
   for _,v in ipairs(invalid_values) do
@@ -383,18 +383,18 @@ local function UpdateCommonControls(i)
       end
     end
     local remote_controls = {}
-    for _,v in ipairs(choices) do -- only subscribe to controls if not already subscribed and they are not system controls
-      if v~='' and not RemoteSubscriptions[remote_name][v] then
-        if v=='code' and not Controls.EnablePullingCode.Boolean then
-          if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
-        elseif isInvalid(remote_name, sysControlNames) then
-          if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
+    for _,controlName in ipairs(choices) do -- only subscribe to controls if not already subscribed and they are not system controls
+      if controlName~='' and not RemoteSubscriptions[remote_name][controlName] then
+        if controlName=='code' and not Controls.EnablePullingCode.Boolean then
+          if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..controlName..'"]') end
+        elseif isInvalid(controlName, sysControlNames) then
+          --if DebugFunction then print('Not adding RemoteSubscriptions["'..remote_name..'"]["'..controlName..'"]') end
         else
-          --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..v..'"]') end
-          table.insert(remote_controls, {["Name"]=v})
+          --if DebugFunction then print('Adding RemoteSubscriptions["'..remote_name..'"]["'..controlName..'"]') end
+          table.insert(remote_controls, {["Name"]=controlName})
         end
       else
-        --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..v..'"] already subscribed') end
+        --if DebugFunction then print('RemoteSubscriptions["'..remote_name..'"]["'..controlName..'"] already subscribed') end
       end
     end
     -- subscribe to controls 
@@ -1020,17 +1020,19 @@ function InitialiseComponents()
             ["Value"]=value
           }}
         } )
-        if RemoteControls[remote_mame] and RemoteControls[remote_mame][control_name] then
-          if DebugFunction then print('RemoteControls['..remote_mame..']['..control_name..'] exists') end
-        else  
-          local count = 0  
-          for i1,j1 in pairs(RemoteControls[remote_mame]) do
-            count = i1 
-            print('RemoteControls['..remote_mame..']['..tostring(j1)..'] found')
-          end
-          if count == 0 then 
-            if DebugFunction then 
-              print('RemoteControls['..remote_mame..'] has no controls stored')
+        if RemoteControls[remote_mame] then
+          if RemoteControls[remote_mame][control_name] then
+            if DebugFunction then print('RemoteControls['..remote_mame..']['..control_name..'] exists') end
+          else  
+            local count = 0  
+            for i1,j1 in pairs(RemoteControls[remote_mame]) do
+              count = i1 
+              print('RemoteControls['..remote_mame..']['..tostring(j1)..'] found')
+            end
+            if count == 0 then 
+              if DebugFunction then 
+                print('RemoteControls['..remote_mame..'] has no controls stored')
+              end
             end
           end
         end   
