@@ -494,7 +494,14 @@ local function SyncComponents()
     --if DebugFunction then print('Starting SyncComponentTimer') end
     SyncComponentTimer.EventHandler = SyncNexItem
     SyncComponentTimer:Start(SyncComponentTime)
-  end 
+  end
+end
+
+local function SyncComponent(name) -- request fresh controls from the remote; HandleRemoteControlsData queues every control and triggers SyncComponents()
+  if DebugFunction then print('SyncComponent("'..(name or '')..'")') end
+  if name and name ~= '' then
+    EnqueueData('Component.GetControls', {["Name"]=name})
+  end
 end
 
 local function UpdateCommonComponents(remote) -- remote is RemoteComponents
@@ -1090,7 +1097,11 @@ function InitialiseComponents()
       end
       Controls.LocalControls[i].Choices = choices_
       --UpdateCommonControls(i) -- this is called from HandleRemoteControlsData()
-      EnqueueData('Component.GetControls', {["Name"]=Controls.RemoteComponents[i].String}) -- refresh remote data to sync with
+      if Controls.RemoteComponents[i].String ~= '' then 
+        EnqueueData('Component.GetControls', {["Name"]=Controls.RemoteComponents[i].String}) -- refresh remote data to sync with
+      else
+        if DebugFunction then print('RemoteComponents['..i..'] is not selected, not getting controls') end
+      end
     end
   end
 
@@ -1101,7 +1112,7 @@ function InitialiseComponents()
       table.insert(choices, v.Name)
       LocalComponents[v.Name] = Component.New(v.Name)
       local types = { -- for info only to use some other time
-          'gain', 'device_controller_script', 'usb_telephony', 'usb_ccontrols', 'usb_keyboard',
+          'gain', 'device_controller_script', 'usb_telephony', 'usb_controls', 'usb_keyboard',
           'lightbar', 'touchscreen_sensors', 'spe_uci', 'snapshot_controller',
           'onvif_camera_operative', 'usb_uvc', 'custom_controls',
           '%PLUGIN%_(.+)_%FP%_(.+)' --'%PLUGIN%_63fb5d0a-5fdc-4c31-b63f-120c0fd29ca2_%FP%_f0e0123189fe1a5e530828d7ce47fcce'
@@ -1172,7 +1183,7 @@ function InitialiseComponents()
 
       Controls.SyncComponent[i].EventHandler = function(ctl)
         --print('SyncComponent['..i..'] event '..tostring(ctl.Boolean))
-        if ctl.Boolean then SyncComponent(Controls.CommonComponents[i].String) end
+        if ctl.Boolean then SyncComponent(Controls.RemoteComponents[i].String) end
       end
 
     end 
