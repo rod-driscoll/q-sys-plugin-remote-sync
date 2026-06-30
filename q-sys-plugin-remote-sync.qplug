@@ -806,7 +806,10 @@ if Controls then
   end
   
   local sysControlNames = { '^log.%w', '^script.%w', '^halt.%w', '^magic.number', '^reload' } -- beware: if you add a $ to the end of one of these values then the compiler will convert it to "end" and break the *.qplug
-  local sysControlProps = { 'Name', 'Component', 'Direction', 'Type' }  
+  local sysControlProps = { 'Name', 'Component', 'Direction', 'Type' }
+  -- Remote QRC reports these as 'Indeterminate'/'Disabled'/'Invisible' but the
+  -- local Control object exposes them as 'IsIndeterminate'/'IsDisabled'/'IsInvisible'.
+  local remoteToLocalPropName = { Indeterminate = 'IsIndeterminate', Disabled = 'IsDisabled', Invisible = 'IsInvisible' }
   local function isInvalid(val, invalid_values)
     for _,v in ipairs(invalid_values) do
       if val==v or val:match(v) then return true end
@@ -820,8 +823,15 @@ if Controls then
     print('UpdateCommonControls('..i..') "'..remote_name..'", local controls: '..#Controls.LocalControls[i].Choices)
     local choices = {[1]= ''}
     local lookup = {}
-    for _,v in pairs(Controls.LocalControls[i].Choices) do 
-      if v~='' then lookup[v] = true end -- Create lookup table
+    -- Local controls cannot contain '.' (Q-Sys can't write to them via Lua), so
+    -- the convention is to replace '.' with '_' on the local side. Index the
+    -- lookup under BOTH the literal name and the underscored form so a local
+    -- "Album_6" matches a remote "Album.6" as a common control.
+    for _,v in pairs(Controls.LocalControls[i].Choices) do
+      if v~='' then
+        lookup[v] = true
+        lookup[(v:gsub("_", "."))] = true
+      end
     end
     local seen = {} -- avoid repeats
     for _,v in ipairs(Controls.RemoteControls[i].Choices) do
@@ -924,14 +934,48 @@ if Controls then
           if targetCtl == nil then
             if DebugFunction then print('SyncControl MISS local="'..localName_..'" ctl="'..control_name..'"') end
           else
+            -- Detect "list" controls: remote Text controls whose .String holds a
+            -- JSON array of choices (e.g. StationList.6, GenreList.6 in the
+            -- SoundMachine plugin). For these we'll populate the local ComboBox
+            -- Choices from the parsed JSON below, and skip writing the raw JSON
+            -- into local .String — the actual selection lives in a sibling
+            -- control (e.g. Station.6 alongside StationList.6).
+            local remoteStr = RemoteControls[component_name][control_name].String
+            local isJsonArray = type(remoteStr) == 'string' and remoteStr:sub(1, 1) == '['
             for k,v in pairs(RemoteControls[component_name][control_name]) do
               if not isInvalid(k, sysControlProps) then
-                local success, msg = pcall(function()
-                  if targetCtl[k] ~= nil then
-                    targetCtl[k] = v
+                if isJsonArray and k == 'String' then
+                  -- skip: the JSON shouldn't appear as the selected text
+                else
+                  local localKey = remoteToLocalPropName[k] or k
+                  local success, msg = pcall(function()
+                    if targetCtl[localKey] ~= nil then
+                      targetCtl[localKey] = v
+                    end
+                  end) --pcall because some remote properties may not exist on every local Control type
+                  if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..localKey..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+                end
+              end
+            end
+            -- Local ComboBox controls require the table-of-tables shape:
+            -- {{Text="Item 1"}, {Text="Item 2"}, ...} per Q-Sys forum guidance.
+            if isJsonArray then
+              local ok, parsed = pcall(rapidjson.decode, remoteStr)
+              if ok and type(parsed) == 'table' and #parsed > 0 then
+                local choices = {}
+                for _, item in ipairs(parsed) do
+                  local name
+                  if type(item) == 'string' then
+                    name = item
+                  elseif type(item) == 'table' and item.name ~= nil then
+                    name = tostring(item.name)
                   end
-                end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-                if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..k..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+                  if name then table.insert(choices, {Text = name}) end
+                end
+                if #choices > 0 then
+                  local choicesOk, choicesErr = pcall(function() targetCtl.Choices = choices end)
+                  if not choicesOk and DebugFunction then print('SyncControl Choices write failed local["'..localName_..'"]["'..control_name..'"]: '..tostring(choicesErr)) end
+                end
               end
             end
           end
@@ -1581,19 +1625,23 @@ if Controls then
           for _,v1 in ipairs(ctls) do
             if LocalComponents[local_component_name][v1.Name]~=nil then
               --if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
-              LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)   
+              -- Translate local underscored name back to dotted form for the
+              -- remote (e.g. local "Album_6" -> remote "Album.6"). Q-Sys forbids
+              -- '.' in writable local control names, so the local side uses '_'.
+              local remoteName_ = v1.Name:gsub("_", ".")
+              LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)
                 local val = ctl.Type=='Text' and ctl.String or ctl.Value
                 if ctl.Type=='Boolean' then val = ctl.Boolean -- can't do this in a ternary because a boolean can be false
                 elseif ctl.Type=='Trigger' then val = ctl.Boolean -- Triggers aren't really supported in QSC protocol
                 end -- can't do this in a ternary because a boolean can be false
-                if v1.Name=='code' and not Controls.EnablePushingCode.Boolean then 
+                if v1.Name=='code' and not Controls.EnablePushingCode.Boolean then
                    if DebugFunction then print('not sending local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]')  end
                 else
-                  if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
+                  if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"] (-> "'..remoteName_..'"): '..tostring(val))  end
                   if ctl.Type=='Trigger' then
-                    SendEventToRemote(local_component_name, v1.Name, 'trigger')
+                    SendEventToRemote(local_component_name, remoteName_, 'trigger')
                   end
-                  SendEventToRemote(local_component_name, v1.Name, val)
+                  SendEventToRemote(local_component_name, remoteName_, val)
                 end
               end
             end

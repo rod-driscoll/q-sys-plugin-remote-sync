@@ -509,15 +509,48 @@ local function SyncControl(component_name, control_name)
         if targetCtl == nil then
           if DebugFunction then print('SyncControl MISS local="'..localName_..'" ctl="'..control_name..'"') end
         else
+          -- Detect "list" controls: remote Text controls whose .String holds a
+          -- JSON array of choices (e.g. StationList.6, GenreList.6 in the
+          -- SoundMachine plugin). For these we'll populate the local ComboBox
+          -- Choices from the parsed JSON below, and skip writing the raw JSON
+          -- into local .String — the actual selection lives in a sibling
+          -- control (e.g. Station.6 alongside StationList.6).
+          local remoteStr = RemoteControls[component_name][control_name].String
+          local isJsonArray = type(remoteStr) == 'string' and remoteStr:sub(1, 1) == '['
           for k,v in pairs(RemoteControls[component_name][control_name]) do
             if not isInvalid(k, sysControlProps) then
-              local localKey = remoteToLocalPropName[k] or k
-              local success, msg = pcall(function()
-                if targetCtl[localKey] ~= nil then
-                  targetCtl[localKey] = v
+              if isJsonArray and k == 'String' then
+                -- skip: the JSON shouldn't appear as the selected text
+              else
+                local localKey = remoteToLocalPropName[k] or k
+                local success, msg = pcall(function()
+                  if targetCtl[localKey] ~= nil then
+                    targetCtl[localKey] = v
+                  end
+                end) --pcall because some remote properties may not exist on every local Control type
+                if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..localKey..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+              end
+            end
+          end
+          -- Local ComboBox controls require the table-of-tables shape:
+          -- {{Text="Item 1"}, {Text="Item 2"}, ...} per Q-Sys forum guidance.
+          if isJsonArray then
+            local ok, parsed = pcall(rapidjson.decode, remoteStr)
+            if ok and type(parsed) == 'table' and #parsed > 0 then
+              local choices = {}
+              for _, item in ipairs(parsed) do
+                local name
+                if type(item) == 'string' then
+                  name = item
+                elseif type(item) == 'table' and item.name ~= nil then
+                  name = tostring(item.name)
                 end
-              end) --pcall because some remote properties may not exist on every local Control type
-              if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..localKey..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+                if name then table.insert(choices, {Text = name}) end
+              end
+              if #choices > 0 then
+                local choicesOk, choicesErr = pcall(function() targetCtl.Choices = choices end)
+                if not choicesOk and DebugFunction then print('SyncControl Choices write failed local["'..localName_..'"]["'..control_name..'"]: '..tostring(choicesErr)) end
+              end
             end
           end
         end
