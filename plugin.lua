@@ -25,6 +25,12 @@ function RectifyProperties(props)
 	return props
 end
 
+function GetComponents(props)
+  local components = {}
+  --[[ #include "components.lua" ]]
+  return components
+end
+
 function GetControls(props)
   local ctrls = {}
   --[[ #include "controls.lua" ]]
