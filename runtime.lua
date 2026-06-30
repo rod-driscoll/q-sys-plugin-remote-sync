@@ -395,8 +395,15 @@ local function UpdateCommonControls(i)
   print('UpdateCommonControls('..i..') "'..remote_name..'", local controls: '..#Controls.LocalControls[i].Choices)
   local choices = {[1]= ''}
   local lookup = {}
-  for _,v in pairs(Controls.LocalControls[i].Choices) do 
-    if v~='' then lookup[v] = true end -- Create lookup table
+  -- Local controls cannot contain '.' (Q-Sys can't write to them via Lua), so
+  -- the convention is to replace '.' with '_' on the local side. Index the
+  -- lookup under BOTH the literal name and the underscored form so a local
+  -- "Album_6" matches a remote "Album.6" as a common control.
+  for _,v in pairs(Controls.LocalControls[i].Choices) do
+    if v~='' then
+      lookup[v] = true
+      lookup[(v:gsub("_", "."))] = true
+    end
   end
   local seen = {} -- avoid repeats
   for _,v in ipairs(Controls.RemoteControls[i].Choices) do
@@ -472,25 +479,45 @@ local function SyncControl(component_name, control_name)
       --print('Not Synching a system control: "'..control_name..'"')
     else
       for _,j in pairs(RemoteSelectors[component_name]) do
-        local local_ = Component.New(Controls.LocalComponents[j].String)
-        for k,v in pairs(RemoteControls[component_name][control_name]) do 
-          if not isInvalid(k, sysControlProps) then 
-            local success, msg = pcall(function() 
-              --print('~~~ '..' synching ['..localName_..']['..control_name..']['..k..']: '..v)
-              if local_[control_name][k] then
-                if DebugFunction then 
-                  --print('Updating LocalComponents["'..component_name..'"]["'..control_name..'"]["'..k..'"]: '..(type(v)=='table' and table.concat(v,",") or tostring(v))) 
-                  if control_name:match(DebugPattern) and k=='Choices' then
-                    --print(string.rep('*',35)..' synching:\n    ['..component_name..']['..control_name..']['..k..']: '..(type(v)=='table' and ('\n    ['..table.concat(v,",")) or ('['..tostring(v)))..']')
-                  end
-                end
-                local_[control_name][k] = v
-              end
-            end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-            --if not success and DebugFunction then print('local "'..control_name..'"["'..k..'"] error\n'..msg) end
-          end 
+        local localName_ = Controls.LocalComponents[j].String
+        local localCmp = Component.New(localName_)
+        -- Resolve the live, writable control reference. Q-Sys exposes dotted
+        -- remote control names via two different paths in Lua:
+        --   1) A control literally named "Album.6" is accessed as cmp["Album_6"]
+        --      (the Component metatable replaces '.' with '_').
+        --   2) A Count-array control "Album" with 7 entries is accessed as
+        --      cmp["Album"][6] — dots in the name represent array indexing.
+        local targetCtl
+        if control_name:find("%.") then
+          local underscored = control_name:gsub("%.", "_")
+          pcall(function() targetCtl = localCmp[underscored] end)
+          if targetCtl == nil then
+            local base, idx = control_name:match("^(.+)%.(%d+)$")
+            if base and idx then
+              pcall(function()
+                local baseObj = localCmp[base]
+                if baseObj ~= nil then targetCtl = baseObj[tonumber(idx)] end
+              end)
+            end
+          end
+        else
+          pcall(function() targetCtl = localCmp[control_name] end)
         end
-      end 
+        if targetCtl == nil then
+          if DebugFunction then print('SyncControl MISS local="'..localName_..'" ctl="'..control_name..'"') end
+        else
+          for k,v in pairs(RemoteControls[component_name][control_name]) do
+            if not isInvalid(k, sysControlProps) then
+              local success, msg = pcall(function()
+                if targetCtl[k] ~= nil then
+                  targetCtl[k] = v
+                end
+              end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
+              if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..k..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+            end
+          end
+        end
+      end
     end
   end
 end
@@ -1136,19 +1163,23 @@ function InitialiseComponents()
         for _,v1 in ipairs(ctls) do
           if LocalComponents[local_component_name][v1.Name]~=nil then
             --if DebugFunction then print('adding EventHandler for "'..local_component_name..'"["'..tostring(v1.Name)..'"]') end
-            LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)   
+            -- Translate local underscored name back to dotted form for the
+            -- remote (e.g. local "Album_6" -> remote "Album.6"). Q-Sys forbids
+            -- '.' in writable local control names, so the local side uses '_'.
+            local remoteName_ = v1.Name:gsub("_", ".")
+            LocalComponents[local_component_name][v1.Name].EventHandler = function(ctl)
               local val = ctl.Type=='Text' and ctl.String or ctl.Value
               if ctl.Type=='Boolean' then val = ctl.Boolean -- can't do this in a ternary because a boolean can be false
               elseif ctl.Type=='Trigger' then val = ctl.Boolean -- Triggers aren't really supported in QSC protocol
               end -- can't do this in a ternary because a boolean can be false
-              if v1.Name=='code' and not Controls.EnablePushingCode.Boolean then 
+              if v1.Name=='code' and not Controls.EnablePushingCode.Boolean then
                  if DebugFunction then print('not sending local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]')  end
               else
-                if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"]: '..tostring(val))  end
+                if DebugFunction then print('local '..ctl.Type..' event "'..local_component_name..'"["'..tostring(v1.Name)..'"] (-> "'..remoteName_..'"): '..tostring(val))  end
                 if ctl.Type=='Trigger' then
-                  SendEventToRemote(local_component_name, v1.Name, 'trigger')
+                  SendEventToRemote(local_component_name, remoteName_, 'trigger')
                 end
-                SendEventToRemote(local_component_name, v1.Name, val)
+                SendEventToRemote(local_component_name, remoteName_, val)
               end
             end
           end
