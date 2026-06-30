@@ -381,7 +381,10 @@ function array_intersection(table1, table2) -- returns the intersection of two a
 end
 
 local sysControlNames = { '^log.%w', '^script.%w', '^halt.%w', '^magic.number', '^reload' } -- beware: if you add a $ to the end of one of these values then the compiler will convert it to "end" and break the *.qplug
-local sysControlProps = { 'Name', 'Component', 'Direction', 'Type' }  
+local sysControlProps = { 'Name', 'Component', 'Direction', 'Type' }
+-- Remote QRC reports these as 'Indeterminate'/'Disabled'/'Invisible' but the
+-- local Control object exposes them as 'IsIndeterminate'/'IsDisabled'/'IsInvisible'.
+local remoteToLocalPropName = { Indeterminate = 'IsIndeterminate', Disabled = 'IsDisabled', Invisible = 'IsInvisible' }
 local function isInvalid(val, invalid_values)
   for _,v in ipairs(invalid_values) do
     if val==v or val:match(v) then return true end
@@ -508,12 +511,13 @@ local function SyncControl(component_name, control_name)
         else
           for k,v in pairs(RemoteControls[component_name][control_name]) do
             if not isInvalid(k, sysControlProps) then
+              local localKey = remoteToLocalPropName[k] or k
               local success, msg = pcall(function()
-                if targetCtl[k] ~= nil then
-                  targetCtl[k] = v
+                if targetCtl[localKey] ~= nil then
+                  targetCtl[localKey] = v
                 end
-              end) --pcall because sometimes an unexpected Property does not exist on Control (such as 'Indeterminate', 'Invisible', 'Disabled')
-              if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..k..'"] = '..tostring(v)..' -> '..tostring(msg)) end
+              end) --pcall because some remote properties may not exist on every local Control type
+              if not success and DebugFunction then print('SyncControl pcall error local["'..localName_..'"]["'..control_name..'"]["'..localKey..'"] = '..tostring(v)..' -> '..tostring(msg)) end
             end
           end
         end
