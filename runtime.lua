@@ -10,6 +10,52 @@ local DebugRx=Controls.DebugRx.Boolean
 local DebugFunction=Controls.DebugFunction.Boolean
 local DebugPrint = Properties["Debug Print"].Value
 local DebugPattern = '^Selector' --'^Enable 0' --'%.*'--'invert' -- sometimes i want to pick a single control type to debug and not see the rest
+local ENC_KEY = PluginInfo.Id
+local MySecret -- assigned in InitialiseCore from SecretStorage["text.1"]
+-----------------------------------------------------------------------------------------------------------------------
+-- Password encryption (XOR cipher, pure Lua) - key is PluginInfo.Id
+-----------------------------------------------------------------------------------------------------------------------
+local function byteXor(a, b)
+  local result, bit = 0, 128
+  while bit > 0 do
+    local ab, bb = a >= bit, b >= bit
+    if ab ~= bb then result = result + bit end
+    if ab then a = a - bit end
+    if bb then b = b - bit end
+    bit = math.floor(bit / 2)
+  end
+  return result
+end
+
+local ENC_PREFIX = "ENC:"
+
+local function encryptPassword(plaintext)
+  local keyLen = #ENC_KEY
+  local out = {}
+  for i = 1, #plaintext do
+    out[i] = string.format("%02x", byteXor(
+      string.byte(plaintext, i),
+      string.byte(ENC_KEY, ((i - 1) % keyLen) + 1)
+    ))
+  end
+  return ENC_PREFIX .. table.concat(out)
+end
+
+local function decryptPassword(stored)
+  if stored:sub(1, #ENC_PREFIX) ~= ENC_PREFIX then
+    return stored -- legacy plaintext: return as-is (handles migration)
+  end
+  local keyLen = #ENC_KEY
+  local hex = stored:sub(#ENC_PREFIX + 1)
+  local i = 0
+  return (hex:gsub("%x%x", function(h)
+    i = i + 1
+    return string.char(byteXor(
+      tonumber(h, 16),
+      string.byte(ENC_KEY, ((i - 1) % keyLen) + 1)
+    ))
+  end))
+end
 -----------------------------------------------------------------------------------------------------------------------
 -- Helper functions
 -------------------------------------------------------------------------------------------------------------------
@@ -711,7 +757,7 @@ function ParseResponse(data, raw) -- TODO: break this up onto smaller functions,
               Controls.LoginRequired.Boolean = true 
               Controls.LoggedIn.Boolean = false 
               print('LoginRequired, logging in')
-              Logon({ User = Controls.Username.String, Password = Controls.Password.String })
+              Logon({ User = Controls.Username.String, Password = decryptPassword(MySecret.String) })
             end
           else
             local component_ = Component.New(componentId_)
@@ -912,7 +958,7 @@ socket.Connected = function(sock)
   ReportStatus("OK","")
   if #Controls.Username.String > 0 then
     Controls.LoginRequired.Boolean = true 
-    Logon({ ['User'] = Controls.Username.String, ['Password'] = Controls.Password.String })
+    Logon({ ['User'] = Controls.Username.String, ['Password'] = decryptPassword(MySecret.String) })
   end
   EnqueueData('Component.GetComponents', {})
   local updated = {}
@@ -1002,7 +1048,20 @@ function InitialiseCore()
   end
 
   Controls.Username.EventHandler = LoggedOut
-  Controls.Password.EventHandler = LoggedOut
+
+  MySecret = SecretStorage["text.1"]
+  -- On startup: migrate any legacy plaintext to encrypted form, then mask display
+  if MySecret.String ~= "" then
+    if MySecret.String:sub(1, #ENC_PREFIX) ~= ENC_PREFIX then
+      MySecret.String = encryptPassword(MySecret.String)
+    end
+    Controls.Password.String = string.rep("*", 8)
+  end
+  Controls.Password.EventHandler = function(ctrl)
+    MySecret.String = encryptPassword(ctrl.String)
+    ctrl.String = string.rep("*", 8)
+    LoggedOut()
+  end
 
   ReportStatus("INITIALIZING","Socket Initializing")
   Connect()
