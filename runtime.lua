@@ -950,9 +950,11 @@ local function RemoteComponentSelectEvent(i)
     end
   end
 
-  if ctl.String == '' then 
+  if ctl.String == '' then
     Controls.RemoteControls[i].Choices = {}
     Controls.CommonControls[i].Choices = {}
+    Controls.CommonComponents[i].String  = ''
+    Controls.CommonComponents[i].Choices = {}
   else
     local exists = false
     for _,v1 in ipairs(RemoteSelectors[ctl.String]) do
@@ -1181,9 +1183,11 @@ function InitialiseComponents()
       end
     end
     
-    if local_component_name == '' then 
+    if local_component_name == '' then
       Controls.LocalControls[i].Choices  = {}
       Controls.CommonControls[i].Choices = {}
+      Controls.CommonComponents[i].String  = ''
+      Controls.CommonComponents[i].Choices = {}
     else
       table.insert(LocalSelectors[local_component_name], i) -- add lookup -- e.g. i==1 and LocalSelectors['Mic1'] = { 1 }
       local cmp = Component.New(local_component_name)
